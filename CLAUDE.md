@@ -1,6 +1,7 @@
 ---
 depends:
   - skills/llm.kb
+  - skills/llm-collab
 ---
 
 # git-partial

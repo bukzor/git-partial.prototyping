@@ -1,11 +1,12 @@
 # Roadmap
 
-## Milestones
+See [docs/milestones.kb/](docs/milestones.kb/) for detailed milestone tracking.
 
-### Milestone 1: [Name]
+## Quick Overview
 
-**Status:** Not Started
+- **010: Single-Session Core** - Prove isolated index workflow (happy path only)
+- **020: Multi-Agent Persistence** - Session IDs, concurrent agents, eval-able export
+- **030: Production Hardening** - Error handling, tests, documentation
+- **040: Polish** - UX improvements, ecosystem integration (optional)
 
-**Goal:** [What this milestone achieves]
-
-See [docs/milestones/01-milestone-name.md](docs/milestones/01-milestone-name.md) for details.
+**"Done enough" target:** Milestone 020 solves the stated problem (multi-agent concurrent sessions).

@@ -1,0 +1,28 @@
+$schema: http://json-schema.org/draft-07/schema#
+type: object
+required:
+  - status
+  - goal
+  - depends-on
+  - deliverables
+properties:
+  status:
+    type: string
+    enum:
+      - not-started
+      - in-progress
+      - completed
+  goal:
+    type: string
+    description: One-line summary of what this milestone achieves
+  depends-on:
+    type: array
+    items:
+      type: string
+      pattern: '^\d{3}$'
+    description: List of prerequisite milestone IDs (e.g., ["010", "020"])
+  deliverables:
+    type: array
+    items:
+      type: string
+    description: Concrete outputs that define completion

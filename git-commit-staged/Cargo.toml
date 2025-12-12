@@ -1,0 +1,16 @@
+[package]
+name = "git-commit-staged"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap = { workspace = true, features = ["derive"] }
+git2.workspace = true
+gix-path = "0.10.22"
+
+[dev-dependencies]
+tempfile = "3.23.0"

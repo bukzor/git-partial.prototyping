@@ -1,0 +1,16 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: Mutation Testing
+description: Tracks planned code mutations for post-hoc TDD
+
+type: object
+required: [status]
+additionalProperties: false
+
+properties:
+  status:
+    type: string
+    enum: [todo, done, gap]
+    description: |
+      todo - not yet attempted
+      done - verified that an appropriately-named test fails when this is broken
+      gap - injection caused no test failure; test coverage is deficient (requires Opus to write proper test)

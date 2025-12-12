@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = [
+    "git-commit-staged",
+]
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/bukzor/git-partial"
+
+[workspace.dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+git2 = "0.19"
+
+[workspace.lints.clippy]
+pedantic = "warn"
+nursery = "warn"

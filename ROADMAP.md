@@ -1,6 +1,6 @@
 # Roadmap
 
-See [docs/milestones.kb/](docs/milestones.kb/) for detailed milestone tracking.
+See [docs/dev/milestones.kb/](docs/dev/milestones.kb/) for detailed milestone tracking.
 
 ## Quick Overview
 

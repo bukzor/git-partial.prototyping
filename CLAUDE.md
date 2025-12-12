@@ -10,7 +10,7 @@ Chunk-wise staging for Claude Code agents, emulating `git commit -p` non-interac
 
 ## Design Knowledge
 
-See `docs/design.kb/` for architectural decisions, constraints, and patterns.
+See `docs/dev/design.kb/` for architectural decisions, constraints, and patterns.
 
 ## Status
 

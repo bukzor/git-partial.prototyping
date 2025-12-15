@@ -48,7 +48,11 @@ fn main() -> Result<()> {
     };
 
     // Print short hash + first line of message (like git commit does)
-    println!("[{:.7}] {}", commit_oid, args.message.lines().next().unwrap_or(""));
+    println!(
+        "[{:.7}] {}",
+        commit_oid,
+        args.message.lines().next().unwrap_or("")
+    );
 
     Ok(())
 }

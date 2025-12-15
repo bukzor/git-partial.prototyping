@@ -43,7 +43,7 @@ fn setup_repo() -> TempDir {
     let tmp = TempDir::new().expect("failed to create temp dir");
     let dir = tmp.path();
 
-    git(dir, &["init"]);
+    git(dir, &["init", "-b", "main"]);
     git(dir, &["config", "user.email", "test@test.com"]);
     git(dir, &["config", "user.name", "Test User"]);
 

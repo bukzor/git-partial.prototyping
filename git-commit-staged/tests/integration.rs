@@ -1,7 +1,7 @@
 //! CLI integration tests for git-commit-staged
 //!
-//! These tests run git-commit-staged as a subprocess to test CLI-specific behavior:
-//! argument parsing, -C flag, -n flag, exit codes, stderr formatting.
+//! These tests run git-commit-staged as a subprocess via `git -C <dir> commit-staged`
+//! to test CLI-specific behavior: argument parsing, -n flag, exit codes, stderr formatting.
 //!
 //! Core logic tests are in `git_integration.rs` where they run in-process.
 
@@ -28,14 +28,22 @@ fn git(dir: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&output.stdout).to_string()
 }
 
-/// Helper to run our binary
+/// Helper to run our binary via `git -C <dir> commit-staged`
 fn git_commit_staged(dir: &Path, args: &[&str]) -> std::process::Output {
+    // Ensure our binary is in PATH by prepending its directory
     let binary = env!("CARGO_BIN_EXE_git-commit-staged");
-    Command::new(binary)
+    let bin_dir = Path::new(binary).parent().unwrap();
+    let path = std::env::var("PATH").unwrap_or_default();
+    let new_path = format!("{}:{}", bin_dir.display(), path);
+
+    Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .arg("commit-staged")
         .args(args)
-        .current_dir(dir)
+        .env("PATH", new_path)
         .output()
-        .expect("failed to execute git-commit-staged")
+        .expect("failed to execute git commit-staged")
 }
 
 /// Create a test repo with an initial commit
@@ -55,6 +63,27 @@ fn setup_repo() -> TempDir {
     tmp
 }
 
+/// Helper to run via `git -C <subdir>` within a repo
+fn git_commit_staged_in_subdir(
+    repo_root: &Path,
+    subdir: &str,
+    args: &[&str],
+) -> std::process::Output {
+    let binary = env!("CARGO_BIN_EXE_git-commit-staged");
+    let bin_dir = Path::new(binary).parent().unwrap();
+    let path = std::env::var("PATH").unwrap_or_default();
+    let new_path = format!("{}:{}", bin_dir.display(), path);
+
+    Command::new("git")
+        .arg("-C")
+        .arg(repo_root.join(subdir))
+        .arg("commit-staged")
+        .args(args)
+        .env("PATH", new_path)
+        .output()
+        .expect("failed to execute git commit-staged")
+}
+
 #[test]
 fn respects_directory_scope() {
     let tmp = setup_repo();
@@ -65,8 +94,8 @@ fn respects_directory_scope() {
     fs::write(dir.join("pkg/src/lib.rs"), "// lib\n").unwrap();
     git(dir, &["add", "pkg/src/lib.rs"]);
 
-    // Commit from within pkg/ using -C
-    let output = git_commit_staged(dir, &["-C", "pkg", "src", "-m", "Add lib.rs"]);
+    // Commit from within pkg/ using git -C
+    let output = git_commit_staged_in_subdir(dir, "pkg", &["src", "-m", "Add lib.rs"]);
     assert!(
         output.status.success(),
         "stderr: {}",
@@ -91,7 +120,7 @@ fn directory_scope_prevents_escape() {
     git(dir, &["add", "."]);
 
     // Try to escape pkg/ scope using ../
-    let output = git_commit_staged(dir, &["-C", "pkg", "../other", "-m", "Should fail"]);
+    let output = git_commit_staged_in_subdir(dir, "pkg", &["../other", "-m", "Should fail"]);
     assert!(!output.status.success());
 
     let stderr = String::from_utf8_lossy(&output.stderr);

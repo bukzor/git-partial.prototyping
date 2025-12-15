@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use git_commit_staged::git_commit_staged;
 
@@ -19,10 +19,6 @@ struct Args {
     #[arg(short, long, required = true)]
     message: String,
 
-    /// Run as if git was started in <path>
-    #[arg(short = 'C', long = "directory", default_value = ".")]
-    directory: PathBuf,
-
     /// Show what would be committed without committing
     #[arg(short = 'n', long)]
     dry_run: bool,
@@ -31,7 +27,7 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let result = git_commit_staged(&args.paths, &args.message, &args.directory, args.dry_run)?;
+    let result = git_commit_staged(&args.paths, &args.message, Path::new("."), args.dry_run)?;
 
     println!("Files to commit:");
     for (path, data) in &result.staged_entries {

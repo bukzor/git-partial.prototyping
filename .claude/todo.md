@@ -1,7 +1,5 @@
 # Current Work
 
-## Mutation Testing Gap Closure
-
 - [x] Close remaining `status: gap` mutations in `docs/dev/mutation-testing.kb/`
   - [x] `skip-index-write` - removed dead `unstage_paths` function, added `git_status_clean_after_commit` test
   - [x] Update 5 equivalent mutations to `status: equivalent`
@@ -14,3 +12,6 @@
   - Ported 12 tests from integration.rs to git_integration.rs (in-process)
   - Kept 3 CLI-specific tests: `respects_directory_scope`, `directory_scope_prevents_escape`, `dry_run_does_not_commit`
   - All ported tests validated via mutation testing
+- [x] GHA workflow(s) to run all tests, clippy all code
+  - Single CI workflow with test and lint jobs
+  - Lint job auto-fixes fmt/clippy on PRs and pushes back

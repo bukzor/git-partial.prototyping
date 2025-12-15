@@ -148,10 +148,7 @@ fn find_staged_entries(repo: &Repository, paths: &[PathBuf]) -> Result<Vec<Stage
         // Note: new_file().path() returns the path for all delta types from
         // diff_tree_to_index, including deletions. The old_file fallback was
         // dead code - git2 always populates new_file.path() for this diff type.
-        let path = delta
-            .new_file()
-            .path()
-            .context("diff delta has no path")?;
+        let path = delta.new_file().path().context("diff delta has no path")?;
 
         if !path_matches(path, paths) {
             continue;
@@ -159,7 +156,9 @@ fn find_staged_entries(repo: &Repository, paths: &[PathBuf]) -> Result<Vec<Stage
 
         let path_str = path.to_str().context("path is not valid UTF-8")?.to_owned();
 
-        let entry = if delta.status() == git2::Delta::Deleted { (path_str, None) } else {
+        let entry = if delta.status() == git2::Delta::Deleted {
+            (path_str, None)
+        } else {
             let f = delta.new_file();
             (path_str, Some((f.id(), u32::from(f.mode()))))
         };

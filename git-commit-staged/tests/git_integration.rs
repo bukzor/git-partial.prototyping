@@ -75,13 +75,8 @@ fn git_status_clean_after_commit() {
     git(dir, &["add", "src/file.rs"]);
 
     // Commit via git-commit-staged
-    git_commit_staged(
-        &[PathBuf::from("src/file.rs")],
-        "Commit file",
-        dir,
-        false,
-    )
-    .expect("commit should succeed");
+    git_commit_staged(&[PathBuf::from("src/file.rs")], "Commit file", dir, false)
+        .expect("commit should succeed");
 
     // git status --porcelain should show nothing for this file
     let status = git(dir, &["status", "--porcelain"]);
@@ -131,15 +126,13 @@ fn errors_on_merge_conflict_with_index_error() {
 
     // Verify we have conflicts
     let status = git(dir, &["status", "--porcelain"]);
-    assert!(status.contains("UU"), "should have unmerged files: {status}");
+    assert!(
+        status.contains("UU"),
+        "should have unmerged files: {status}"
+    );
 
     // Call git_commit_staged in-process
-    let result = git_commit_staged(
-        &[PathBuf::from("src")],
-        "Should fail",
-        dir,
-        false,
-    );
+    let result = git_commit_staged(&[PathBuf::from("src")], "Should fail", dir, false);
 
     // Should fail
     let err = result.expect_err("should fail on merge conflict");
@@ -201,7 +194,8 @@ fn only_commits_staged_not_working_copy() {
     fs::write(dir.join("src/main.rs"), "// v2\n").unwrap();
 
     // Commit using our tool
-    git_commit_staged(&[PathBuf::from("src")], "Add v1", dir, false).expect("commit should succeed");
+    git_commit_staged(&[PathBuf::from("src")], "Add v1", dir, false)
+        .expect("commit should succeed");
 
     // Verify the committed content is v1, not v2
     let content = git(dir, &["show", "HEAD:src/main.rs"]);
@@ -460,10 +454,7 @@ fn errors_on_empty_repo() {
 
     let err = result.expect_err("should fail on empty repo");
     let err_str = err.to_string().to_lowercase();
-    assert!(
-        err_str.contains("head"),
-        "error should mention HEAD: {err}"
-    );
+    assert!(err_str.contains("head"), "error should mention HEAD: {err}");
 }
 
 #[test]

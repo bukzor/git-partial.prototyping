@@ -10,4 +10,7 @@
     - `ignore-typechange-delta` - Delta::Typechange never observed
     - `use-only-new-file-path` - removed dead `.or_else()` fallback
     - `use-only-old-file-path` - git2 populates new_file().path() for all deltas
-- [ ] Port remaining CLI error tests to git-integration where beneficial
+- [x] Port CLI tests to git-integration where beneficial
+  - Ported 12 tests from integration.rs to git_integration.rs (in-process)
+  - Kept 3 CLI-specific tests: `respects_directory_scope`, `directory_scope_prevents_escape`, `dry_run_does_not_commit`
+  - All ported tests validated via mutation testing

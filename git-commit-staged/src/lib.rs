@@ -7,12 +7,12 @@ use git2::{Index, Oid, Repository};
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
-/// Result of a successful git_commit_staged operation
+/// Result of a successful `git_commit_staged` operation
 #[derive(Debug)]
 pub struct CommitResult {
     /// The entries that were (or would be) committed
     pub staged_entries: Vec<StagedEntry>,
-    /// The commit OID if a commit was created (None for dry_run)
+    /// The commit OID if a commit was created (None for `dry_run`)
     pub commit_oid: Option<Oid>,
     /// Whether this was a dry run
     pub dry_run: bool,
@@ -30,6 +30,16 @@ pub type StagedEntry = (String, Option<(Oid, u32)>);
 /// * `message` - Commit message
 /// * `directory` - Run as if git was started in this directory
 /// * `dry_run` - If true, show what would be committed without committing
+///
+/// # Errors
+/// Returns an error if:
+/// - The directory cannot be canonicalized
+/// - No git repository is found
+/// - The repository has no workdir (bare repo)
+/// - A path escapes the scope directory
+/// - No HEAD commit exists (empty repo)
+/// - No staged changes exist at the specified paths
+/// - Git operations fail (index read, tree write, commit create)
 pub fn git_commit_staged(
     paths: &[PathBuf],
     message: &str,
@@ -149,12 +159,9 @@ fn find_staged_entries(repo: &Repository, paths: &[PathBuf]) -> Result<Vec<Stage
 
         let path_str = path.to_str().context("path is not valid UTF-8")?.to_owned();
 
-        let entry = match delta.status() {
-            git2::Delta::Deleted => (path_str, None),
-            _ => {
-                let f = delta.new_file();
-                (path_str, Some((f.id(), u32::from(f.mode()))))
-            }
+        let entry = if delta.status() == git2::Delta::Deleted { (path_str, None) } else {
+            let f = delta.new_file();
+            (path_str, Some((f.id(), u32::from(f.mode()))))
         };
 
         staged.push(entry);

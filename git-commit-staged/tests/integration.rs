@@ -413,50 +413,6 @@ fn commits_rename_with_detection_enabled() {
 }
 
 #[test]
-fn errors_on_merge_conflict() {
-    let tmp = setup_repo();
-    let dir = tmp.path();
-
-    // Create a file on main
-    fs::create_dir_all(dir.join("src")).unwrap();
-    fs::write(dir.join("src/conflict.rs"), "// main version\n").unwrap();
-    git(dir, &["add", "src/conflict.rs"]);
-    git(dir, &["commit", "-m", "Add file on main"]);
-
-    // Create a branch and modify
-    git(dir, &["checkout", "-b", "feature"]);
-    fs::write(dir.join("src/conflict.rs"), "// feature version\n").unwrap();
-    git(dir, &["add", "src/conflict.rs"]);
-    git(dir, &["commit", "-m", "Modify on feature"]);
-
-    // Go back to main and make conflicting change
-    git(dir, &["checkout", "main"]);
-    fs::write(dir.join("src/conflict.rs"), "// conflicting main version\n").unwrap();
-    git(dir, &["add", "src/conflict.rs"]);
-    git(dir, &["commit", "-m", "Conflicting change on main"]);
-
-    // Merge feature - will conflict
-    let merge_output = Command::new("git")
-        .args(["merge", "feature"])
-        .current_dir(dir)
-        .output()
-        .expect("failed to run git merge");
-    assert!(!merge_output.status.success(), "merge should conflict");
-
-    // Verify we have conflicts
-    let status = git(dir, &["status", "--porcelain"]);
-    assert!(status.contains("UU"), "should have unmerged files: {status}");
-
-    // Tool should error on conflicted index
-    let output = git_commit_staged(dir, &["src", "-m", "Should fail"]);
-    assert!(
-        !output.status.success(),
-        "should fail on merge conflict"
-    );
-    // Note: error is "invalid entry mode" not "conflict" - room for improvement
-}
-
-#[test]
 fn errors_on_empty_repo() {
     let tmp = TempDir::new().expect("failed to create temp dir");
     let dir = tmp.path();

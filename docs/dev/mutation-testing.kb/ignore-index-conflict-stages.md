@@ -1,6 +1,6 @@
 ---
-status: gap
-attempts: 2
+status: done
+attempts: 3
 ---
 
 # Index Conflicts Unhandled
@@ -8,13 +8,20 @@ attempts: 2
 During a merge conflict, the index has entries at stages 1, 2, 3 (base, ours, theirs) instead of stage 0.
 
 ## Injection
-Add `if delta.status() == git2::Delta::Conflicted { continue; }` to skip conflicts.
+Add `git2::Delta::Conflicted => continue` to skip conflicts in find_staged_entries.
 
-## Attempts
-1. Added `errors_on_merge_conflict` test that creates merge conflict
-2. Injected skip-Conflicted mutation - test still passed
+## Test Coverage
 
-Tool already fails on conflicts with "invalid entry mode" (in create_commit), not in find_staged_entries. The mutation is unkillable because the error path differs from expected.
+`errors_on_merge_conflict_with_index_error` in `tests/git_integration.rs`
 
-## Test Added
-`errors_on_merge_conflict` verifies tool fails on merge conflicts (even if error message is poor).
+## Resolution
+
+Created in-process test that:
+1. Creates merge conflict via git subprocess
+2. Calls `git_commit_staged()` in-process
+3. Verifies error chain contains `git2::Error` with `ErrorClass::Index`
+
+With mutation: skipping Conflicted causes "no staged changes" error (no git2::Error in chain) → test fails.
+Without mutation: processing Conflicted entry causes git2 Index error → test passes.
+
+The previous CLI-level test couldn't distinguish these because both result in non-zero exit, just different error messages.

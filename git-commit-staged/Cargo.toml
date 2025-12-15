@@ -3,6 +3,14 @@ name = "git-commit-staged"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "git_commit_staged"
+path = "src/lib.rs"
+
+[[bin]]
+name = "git-commit-staged"
+path = "src/main.rs"
+
 [lints]
 workspace = true
 

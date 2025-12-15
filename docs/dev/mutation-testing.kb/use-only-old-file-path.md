@@ -1,17 +1,17 @@
 ---
-status: gap
-attempts: 2
+status: equivalent
+attempts: 3
 ---
 
-# Renames Only Delete
+# Use Only Old File Path for Deltas
 
-Git represents renames as delete + add. If we only process the old_file side of a rename delta, the new file wouldn't appear in the commit.
+## Mutation
+Replace `new_file().path()` with `old_file().path()`.
 
-## Injection
-Replace `new_file().path().or_else(...)` with just `old_file().path()` on line 145-148.
+## Finding: Equivalent (Dead Code)
 
-## Attempts
-1. Ran all integration tests - passed
-2. Hardened `commits_staged_file_at_specified_path` with exact path check - passed
+git2 populates both `old_file().path()` and `new_file().path()` with the same value for all delta types from `diff_tree_to_index`. The fallback to `old_file()` was never needed.
 
-Mutation survives because git2 apparently populates both old_file and new_file paths for all delta types, including new files and renames.
+## Resolution
+
+Removed dead `.or_else(|| delta.old_file().path())` fallback. Using `new_file().path()` directly.

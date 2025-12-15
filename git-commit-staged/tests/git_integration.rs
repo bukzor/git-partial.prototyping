@@ -46,6 +46,44 @@ fn setup_repo() -> TempDir {
 }
 
 #[test]
+fn git_status_clean_after_commit() {
+    // Verifies that git status shows committed file as clean (not staged).
+    // Tests whether skipping unstage_paths causes stale index metadata issues.
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Stage a file
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/file.rs"), "// content\n").unwrap();
+    git(dir, &["add", "src/file.rs"]);
+
+    // Commit via git-commit-staged
+    git_commit_staged(
+        &[PathBuf::from("src/file.rs")],
+        "Commit file",
+        dir,
+        false,
+    )
+    .expect("commit should succeed");
+
+    // git status --porcelain should show nothing for this file
+    let status = git(dir, &["status", "--porcelain"]);
+    assert!(
+        !status.contains("src/file.rs"),
+        "committed file should not appear in git status: {}",
+        status
+    );
+
+    // git diff --cached should be empty
+    let diff_cached = git(dir, &["diff", "--cached", "--name-only"]);
+    assert!(
+        diff_cached.trim().is_empty(),
+        "git diff --cached should be empty: {}",
+        diff_cached
+    );
+}
+
+#[test]
 fn errors_on_merge_conflict_with_index_error() {
     let tmp = setup_repo();
     let dir = tmp.path();

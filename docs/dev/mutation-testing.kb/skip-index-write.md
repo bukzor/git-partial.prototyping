@@ -1,19 +1,30 @@
 ---
-status: gap
-attempts: 2
+status: equivalent
+attempts: 3
 ---
 
 # Skip Index Write After Commit
 
-If `unstage_paths` prepares the index but doesn't call `index.write()`, the main index would still show committed paths as staged after the commit completes.
+## Mutation
+Remove the `index.write()` call at the end of `unstage_paths`.
 
-## Mutation Injection
-Remove the `index.write()` call at the end of `unstage_paths` (line 273).
+## Finding: Equivalent (Dead Code)
 
-## Testing Challenge
-Created test `committed_files_unstaged` that stages two files, commits one via the tool, and verifies only the committed file is unstaged. Test passes even with mutation in place. Possible causes:
-- Git's own commands (`git status`, `git ls-files`) may reload the index from disk internally
-- libgit2's behavior when the index isn't written may differ from git CLI
-- Test environment specifics
+The entire `unstage_paths` function was dead code. Investigation:
 
-Requires Opus-level investigation into why the mutation is unkillable through available git operations.
+1. After staging, the index contains `(path, blob_oid, mode)`
+2. After commit, HEAD contains the same `(path, blob_oid, mode)`
+3. `diff_tree_to_index` compares OIDs — they match, so no diff
+4. The file automatically appears "unstaged" because it matches HEAD
+
+`unstage_paths` was overwriting index entries with identical OIDs — a no-op.
+
+## Verification
+
+- Skipping `unstage_paths` entirely: all tests pass
+- Sabotaging it (removing files from index): `git_status_clean_after_commit` catches it
+- The test can detect real corruption, confirming the original code was equivalent
+
+## Resolution
+
+Removed `unstage_paths` function and its call site. Added `git_status_clean_after_commit` test to verify post-commit index state.

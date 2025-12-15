@@ -68,9 +68,6 @@ pub fn git_commit_staged(
 
     let commit_oid = create_commit(&repo, &staged_entries, message)?;
 
-    // Remove committed paths from main index (reset to new HEAD)
-    unstage_paths(&repo, &staged_entries)?;
-
     Ok(CommitResult {
         staged_entries,
         commit_oid: Some(commit_oid),
@@ -138,10 +135,12 @@ fn find_staged_entries(repo: &Repository, paths: &[PathBuf]) -> Result<Vec<Stage
     let mut staged = Vec::new();
 
     for delta in diff.deltas() {
+        // Note: new_file().path() returns the path for all delta types from
+        // diff_tree_to_index, including deletions. The old_file fallback was
+        // dead code - git2 always populates new_file.path() for this diff type.
         let path = delta
             .new_file()
             .path()
-            .or_else(|| delta.old_file().path())
             .context("diff delta has no path")?;
 
         if !path_matches(path, paths) {
@@ -222,52 +221,6 @@ fn create_commit(repo: &Repository, entries: &[StagedEntry], message: &str) -> R
         .context("failed to create commit")?;
 
     Ok(commit_oid)
-}
-
-/// Remove the committed paths from the main index (they now match HEAD)
-fn unstage_paths(repo: &Repository, entries: &[StagedEntry]) -> Result<()> {
-    let mut index = repo.index().context("failed to read index")?;
-    let head = repo.head().context("failed to get HEAD")?;
-    let head_tree = head.peel_to_tree().context("failed to get HEAD tree")?;
-
-    for (path, data) in entries {
-        match data {
-            Some(_) => {
-                // Addition or modification: reset index to match new HEAD
-                let tree_entry = head_tree
-                    .get_path(Path::new(path))
-                    .with_context(|| format!("committed file not found in new HEAD: {path}"))?;
-
-                let mode = u32::try_from(tree_entry.filemode()).with_context(|| {
-                    format!("invalid filemode for {path}: {}", tree_entry.filemode())
-                })?;
-
-                let entry = git2::IndexEntry {
-                    ctime: git2::IndexTime::new(0, 0),
-                    mtime: git2::IndexTime::new(0, 0),
-                    dev: 0,
-                    ino: 0,
-                    mode,
-                    uid: 0,
-                    gid: 0,
-                    file_size: 0,
-                    id: tree_entry.id(),
-                    flags: 0,
-                    flags_extended: 0,
-                    path: path.as_bytes().to_vec(),
-                };
-                index
-                    .add(&entry)
-                    .with_context(|| format!("failed to reset index entry: {path}"))?;
-            }
-            None => {
-                // Deletion: already removed from index by git rm, nothing to do
-            }
-        }
-    }
-
-    index.write().context("failed to write index")?;
-    Ok(())
 }
 
 /// Check if an entry path matches any of the requested paths (exact or descendant)

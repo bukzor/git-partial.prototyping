@@ -165,10 +165,8 @@ fn commits_staged_file_at_specified_path() {
     git(dir, &["add", "src/main.rs"]);
 
     // Commit it
-    let result = git_commit_staged(&[PathBuf::from("src")], "Add main.rs", dir, false)
+    let _result = git_commit_staged(&[PathBuf::from("src")], "Add main.rs", dir, false)
         .expect("commit should succeed");
-
-    assert!(result.commit_oid.is_some());
 
     // Verify commit exists
     let log = git(dir, &["log", "--oneline", "-1"]);

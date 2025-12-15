@@ -95,7 +95,7 @@ fn respects_directory_scope() {
     git(dir, &["add", "pkg/src/lib.rs"]);
 
     // Commit from within pkg/ using git -C
-    let output = git_commit_staged_in_subdir(dir, "pkg", &["src", "-m", "Add lib.rs"]);
+    let output = git_commit_staged_in_subdir(dir, "pkg", &["src", "--", "-m", "Add lib.rs"]);
     assert!(
         output.status.success(),
         "stderr: {}",
@@ -120,7 +120,7 @@ fn directory_scope_prevents_escape() {
     git(dir, &["add", "."]);
 
     // Try to escape pkg/ scope using ../
-    let output = git_commit_staged_in_subdir(dir, "pkg", &["../other", "-m", "Should fail"]);
+    let output = git_commit_staged_in_subdir(dir, "pkg", &["../other", "--", "-m", "Should fail"]);
     assert!(!output.status.success());
 
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -140,11 +140,11 @@ fn dry_run_does_not_commit() {
     let log_before = git(dir, &["rev-list", "--count", "HEAD"]);
 
     // Dry run
-    let output = git_commit_staged(dir, &["-n", "src", "-m", "Dry run"]);
+    let output = git_commit_staged(dir, &["-n", "src", "--", "-m", "Dry run"]);
     assert!(output.status.success());
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Dry run"));
+    assert_eq!(stdout.trim(), "Files to commit:\n  M src/main.rs");
 
     // Commit count should be unchanged
     let log_after = git(dir, &["rev-list", "--count", "HEAD"]);
@@ -153,4 +153,114 @@ fn dry_run_does_not_commit() {
     // File should still be staged
     let status = git(dir, &["status", "--porcelain"]);
     assert!(status.contains("A  src/main.rs"));
+}
+
+// =============================================================================
+// Passthrough argument tests
+// =============================================================================
+
+#[test]
+fn amend_modifies_last_commit() {
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Create initial commit with one file
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    git(dir, &["add", "src/main.rs"]);
+    git(dir, &["commit", "-m", "Initial src"]);
+
+    let log_before = git(dir, &["rev-list", "--count", "HEAD"]);
+
+    // Modify and stage
+    fs::write(
+        dir.join("src/main.rs"),
+        "fn main() { println!(\"hello\"); }\n",
+    )
+    .unwrap();
+    git(dir, &["add", "src/main.rs"]);
+
+    // Amend via passthrough
+    let output = git_commit_staged(dir, &["src", "--", "--amend", "--no-edit"]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Commit count should be unchanged (amend, not new commit)
+    let log_after = git(dir, &["rev-list", "--count", "HEAD"]);
+    assert_eq!(log_before, log_after);
+
+    // Verify the amended content
+    let content = git(dir, &["show", "HEAD:src/main.rs"]);
+    assert!(content.contains("println"));
+}
+
+#[test]
+fn fixup_creates_fixup_commit() {
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Create a commit to fixup
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    git(dir, &["add", "src/main.rs"]);
+    git(dir, &["commit", "-m", "Add main.rs"]);
+
+    let target_commit = git(dir, &["rev-parse", "HEAD"]).trim().to_string();
+
+    // Make another commit
+    fs::write(dir.join("src/lib.rs"), "// lib\n").unwrap();
+    git(dir, &["add", "src/lib.rs"]);
+    git(dir, &["commit", "-m", "Add lib.rs"]);
+
+    // Now stage a fix for main.rs
+    fs::write(dir.join("src/main.rs"), "fn main() { /* fixed */ }\n").unwrap();
+    git(dir, &["add", "src/main.rs"]);
+
+    // Create fixup commit
+    let output = git_commit_staged(dir, &["src/main.rs", "--", "--fixup", &target_commit]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Verify fixup commit message
+    let log = git(dir, &["log", "--oneline", "-1"]);
+    assert!(
+        log.contains("fixup!"),
+        "commit should be a fixup commit: {log}"
+    );
+}
+
+#[test]
+fn reuse_message_with_c_flag() {
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Create a commit with a specific message
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    git(dir, &["add", "src/main.rs"]);
+    git(dir, &["commit", "-m", "Original message to reuse"]);
+
+    let source_commit = git(dir, &["rev-parse", "HEAD"]).trim().to_string();
+
+    // Make a new change
+    fs::write(dir.join("src/lib.rs"), "// lib\n").unwrap();
+    git(dir, &["add", "src/lib.rs"]);
+
+    // Commit reusing the message from the previous commit
+    let output = git_commit_staged(dir, &["src/lib.rs", "--", "-C", &source_commit]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Verify the message was reused
+    let log = git(dir, &["log", "--format=%s", "-1"]);
+    assert_eq!(log.trim(), "Original message to reuse");
 }

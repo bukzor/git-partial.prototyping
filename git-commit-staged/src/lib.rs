@@ -12,10 +12,8 @@ use std::path::{Path, PathBuf};
 pub struct CommitResult {
     /// The entries that were (or would be) committed
     pub staged_entries: Vec<StagedEntry>,
-    /// The commit OID if a commit was created (None for `dry_run`)
+    /// The commit OID if a commit was created (None for dry run)
     pub commit_oid: Option<Oid>,
-    /// Whether this was a dry run
-    pub dry_run: bool,
 }
 
 /// Entry: (path, `blob_oid`, filemode) - None means deletion
@@ -72,7 +70,6 @@ pub fn git_commit_staged(
         return Ok(CommitResult {
             staged_entries,
             commit_oid: None,
-            dry_run: true,
         });
     }
 
@@ -81,7 +78,6 @@ pub fn git_commit_staged(
     Ok(CommitResult {
         staged_entries,
         commit_oid: Some(commit_oid),
-        dry_run: false,
     })
 }
 

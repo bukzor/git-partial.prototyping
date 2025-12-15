@@ -1,6 +1,5 @@
 use anyhow::Result;
 use clap::Parser;
-use git2::Repository;
 use std::path::PathBuf;
 
 use git_commit_staged::git_commit_staged;
@@ -41,34 +40,15 @@ fn main() -> Result<()> {
     }
     println!();
 
-    if result.dry_run {
-        println!("Dry run - not committing");
-        println!();
+    let Some(commit_oid) = result.commit_oid else {
+        // Dry run
         println!("Would commit with message:");
         println!("  {}", args.message);
         return Ok(());
-    }
+    };
 
-    if let Some(commit_oid) = result.commit_oid {
-        println!("Created commit: {commit_oid}");
-        let repo = Repository::discover(&args.directory)?;
-        print_commit_oneline(&repo, commit_oid)?;
-    }
+    // Print short hash + first line of message (like git commit does)
+    println!("[{:.7}] {}", commit_oid, args.message.lines().next().unwrap_or(""));
 
-    Ok(())
-}
-
-fn print_commit_oneline(repo: &Repository, oid: git2::Oid) -> Result<()> {
-    use anyhow::Context;
-    let commit = repo.find_commit(oid).context("failed to find commit")?;
-    let short_id = commit
-        .as_object()
-        .short_id()
-        .context("failed to get short id")?;
-    let short_id_str = short_id.as_str().context("short id is not valid UTF-8")?;
-    let summary = commit
-        .summary()
-        .context("commit message is not valid UTF-8")?;
-    println!("{short_id_str} {summary}");
     Ok(())
 }

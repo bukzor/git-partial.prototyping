@@ -169,7 +169,6 @@ fn commits_staged_file_at_specified_path() {
         .expect("commit should succeed");
 
     assert!(result.commit_oid.is_some());
-    assert!(!result.dry_run);
 
     // Verify commit exists
     let log = git(dir, &["log", "--oneline", "-1"]);

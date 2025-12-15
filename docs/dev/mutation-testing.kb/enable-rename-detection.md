@@ -1,18 +1,48 @@
 ---
 status: gap
+attempts: 2
 ---
 
 # Rename With Detection Loses Old File
 
-If git's rename detection is enabled (via config or DiffOptions), a rename shows as a single `Delta::Renamed` instead of separate Add + Delete.
+If git's rename detection is enabled, a rename could show as a single `Delta::Renamed` instead of separate Add + Delete.
 
-Current code:
-1. Gets path from `new_file()` (the destination)
-2. Hits the `_` arm (not Deleted), adds destination with content
-3. Never removes the source
+Current code doesn't explicitly handle `Delta::Renamed`:
+1. Would get path from `new_file()` (the destination)
+2. Hits the `_` arm, adds destination with content
+3. Never removes the source → old file persists in commit tree
 
-The old file would persist in the commit tree alongside the new one.
+## Mutation Attempted
 
-Test currently passes because `diff_tree_to_index(..., None)` doesn't enable rename detection. But if user has `diff.renames=true` in gitconfig, this could break.
+In `find_staged_entries` (main.rs:157-163), injected explicit `Delta::Renamed` handling that only adds the destination:
 
-Inject by passing DiffOptions with `opts.renames(true)` and verifying old file persists.
+```rust
+git2::Delta::Renamed => {
+    let f = delta.new_file();
+    (path_str, Some((f.id(), u32::from(f.mode()))))
+}
+```
+
+This should cause the old file to persist in the commit tree when a rename is detected.
+
+## Test Result
+
+**FAIL (test doesn't catch mutation)**
+
+Added test `commits_rename_with_detection_enabled` which:
+- Sets `diff.renames=true` in git config
+- Creates a rename with `git mv`
+- Verifies old file is deleted from HEAD
+
+Test passed even with mutation injected because libgit2's `diff_tree_to_index()` does NOT return `Delta::Renamed` even when git config has `diff.renames=true`.
+
+## Root Cause
+
+- libgit2 rename detection is only supported for tree-to-tree diffs, not tree-to-index
+- git2-rs `DiffOptions` has no `renames()` method to enable it explicitly
+- Therefore, git2 returns Delete+Add deltas for renames, not `Delta::Renamed`
+- The buggy code path is unreachable with current libgit2 API
+
+## Verdict: GAP
+
+This is a theoretical vulnerability that cannot be tested with current libgit2 capabilities. Deferred to Opus.

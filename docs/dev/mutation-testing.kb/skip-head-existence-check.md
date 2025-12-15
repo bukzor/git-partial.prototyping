@@ -1,11 +1,13 @@
 ---
-status: gap
+status: done
 ---
 
 # Empty Repo No HEAD
 
 On a fresh repo with no commits, `repo.head()` fails or returns an unborn branch.
 
-Current code would error at "failed to get HEAD" which is acceptable, but the error message could be clearer: "cannot commit-staged in repo with no commits".
+## Injection
+Change `find_staged_entries` to return empty Vec instead of erroring when HEAD doesn't exist.
 
-Not strictly a breakage, but worth testing the error path.
+## Test Coverage
+`errors_on_empty_repo` test catches this - it verifies the error message mentions HEAD. Mutation causes tool to silently report "no staged changes" which fails the assertion.

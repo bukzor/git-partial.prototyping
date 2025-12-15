@@ -290,9 +290,7 @@ fn print_commit_oneline(repo: &Repository, oid: Oid) -> Result<()> {
 
 /// Check if an entry path matches any of the requested paths (exact or descendant)
 fn path_matches(entry_path: &Path, requested_paths: &[PathBuf]) -> bool {
-    requested_paths
-        .iter()
-        .any(|p| entry_path == p || entry_path.starts_with(p))
+    requested_paths.iter().any(|p| entry_path.starts_with(p))
 }
 
 #[cfg(test)]

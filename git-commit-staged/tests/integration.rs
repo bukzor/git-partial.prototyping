@@ -5,6 +5,8 @@
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 use tempfile::TempDir;
 
@@ -248,6 +250,56 @@ fn commits_staged_mode_change() {
     // Verify the commit happened
     let log = git(dir, &["log", "--oneline", "-1"]);
     assert!(log.contains("Make script executable"));
+
+    // Verify the executable bit was actually committed
+    // Check out the file and verify it's executable
+    git(dir, &["checkout", "HEAD", "--", "src/script.sh"]);
+    let metadata = std::fs::metadata(dir.join("src/script.sh")).unwrap();
+    let mode = metadata.permissions().mode();
+    assert_eq!(
+        mode & 0o111,
+        0o111,
+        "file should be executable, mode: {:o}",
+        mode
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn commits_staged_typechange() {
+    use std::os::unix::fs::symlink;
+
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Create and commit a regular file
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/link.txt"), "original content\n").unwrap();
+    git(dir, &["add", "src/link.txt"]);
+    git(dir, &["commit", "-m", "Add regular file"]);
+
+    // Replace with symlink (typechange)
+    fs::remove_file(dir.join("src/link.txt")).unwrap();
+    symlink("../README.md", dir.join("src/link.txt")).unwrap();
+    git(dir, &["add", "src/link.txt"]);
+
+    let status = git(dir, &["status", "--porcelain"]);
+    assert!(status.contains("T  src/link.txt"), "should show typechange: {status}");
+
+    // Commit the typechange
+    let output = git_commit_staged(dir, &["src", "-m", "Change to symlink"]);
+    assert!(
+        output.status.success(),
+        "should commit typechange, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Verify it's a symlink in HEAD
+    let ls_tree = git(dir, &["ls-tree", "HEAD", "src/link.txt"]);
+    assert!(
+        ls_tree.contains("120000"),
+        "should be symlink mode (120000): {ls_tree}"
+    );
 }
 
 #[test]
@@ -314,6 +366,122 @@ fn commits_staged_rename() {
 }
 
 #[test]
+fn commits_rename_with_detection_enabled() {
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Create and commit a file
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/old_name.rs"), "// content\n").unwrap();
+    git(dir, &["add", "src/old_name.rs"]);
+    git(dir, &["commit", "-m", "Add old_name.rs"]);
+
+    // Enable rename detection in git config
+    git(dir, &["config", "diff.renames", "true"]);
+
+    // Rename it
+    git(dir, &["mv", "src/old_name.rs", "src/new_name.rs"]);
+
+    let status = git(dir, &["status", "--porcelain"]);
+    assert_eq!(status, "R  src/old_name.rs -> src/new_name.rs\n");
+
+    // Commit specifying the src directory
+    let output = git_commit_staged(dir, &["src", "-m", "Rename file"]);
+    assert!(
+        output.status.success(),
+        "should commit rename with detection enabled, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Verify both old gone and new exists
+    let show = git(dir, &["show", "--name-status", "--format="]);
+    assert!(show.contains("src/new_name.rs"), "new file should exist: {show}");
+    // Old file should be gone from HEAD - this is the critical check
+    let ls = git(dir, &["ls-tree", "-r", "HEAD"]);
+    assert!(
+        !ls.contains("old_name.rs"),
+        "old file should be deleted but persists: {ls}"
+    );
+
+    // Extra validation: check commit tree contents directly
+    let commit_tree = git(dir, &["rev-parse", "HEAD^{tree}"]);
+    let tree_contents = git(dir, &["ls-tree", "-r", commit_tree.trim()]);
+    assert!(
+        !tree_contents.contains("old_name.rs"),
+        "committed tree should not have old_name.rs: {tree_contents}"
+    );
+}
+
+#[test]
+fn errors_on_merge_conflict() {
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Create a file on main
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/conflict.rs"), "// main version\n").unwrap();
+    git(dir, &["add", "src/conflict.rs"]);
+    git(dir, &["commit", "-m", "Add file on main"]);
+
+    // Create a branch and modify
+    git(dir, &["checkout", "-b", "feature"]);
+    fs::write(dir.join("src/conflict.rs"), "// feature version\n").unwrap();
+    git(dir, &["add", "src/conflict.rs"]);
+    git(dir, &["commit", "-m", "Modify on feature"]);
+
+    // Go back to main and make conflicting change
+    git(dir, &["checkout", "main"]);
+    fs::write(dir.join("src/conflict.rs"), "// conflicting main version\n").unwrap();
+    git(dir, &["add", "src/conflict.rs"]);
+    git(dir, &["commit", "-m", "Conflicting change on main"]);
+
+    // Merge feature - will conflict
+    let merge_output = Command::new("git")
+        .args(["merge", "feature"])
+        .current_dir(dir)
+        .output()
+        .expect("failed to run git merge");
+    assert!(!merge_output.status.success(), "merge should conflict");
+
+    // Verify we have conflicts
+    let status = git(dir, &["status", "--porcelain"]);
+    assert!(status.contains("UU"), "should have unmerged files: {status}");
+
+    // Tool should error on conflicted index
+    let output = git_commit_staged(dir, &["src", "-m", "Should fail"]);
+    assert!(
+        !output.status.success(),
+        "should fail on merge conflict"
+    );
+    // Note: error is "invalid entry mode" not "conflict" - room for improvement
+}
+
+#[test]
+fn errors_on_empty_repo() {
+    let tmp = TempDir::new().expect("failed to create temp dir");
+    let dir = tmp.path();
+
+    git(dir, &["init"]);
+    git(dir, &["config", "user.email", "test@test.com"]);
+    git(dir, &["config", "user.name", "Test User"]);
+
+    // Create and stage a file but don't commit
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    git(dir, &["add", "src/main.rs"]);
+
+    // Tool should error - no HEAD exists
+    let output = git_commit_staged(dir, &["src", "-m", "First commit"]);
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("HEAD") || stderr.contains("head"),
+        "error should mention HEAD: {stderr}"
+    );
+}
+
+#[test]
 fn errors_when_no_staged_changes() {
     let tmp = setup_repo();
     let dir = tmp.path();
@@ -331,4 +499,37 @@ fn errors_when_no_staged_changes() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("no staged changes"));
+}
+
+#[test]
+fn committed_files_unstaged() {
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Stage two files
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::create_dir_all(dir.join("tests")).unwrap();
+    fs::write(dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    fs::write(dir.join("tests/test.rs"), "#[test] fn test() {}\n").unwrap();
+    git(dir, &["add", "src/main.rs", "tests/test.rs"]);
+
+    // Verify both are staged
+    let status_before = git(dir, &["status", "--porcelain"]);
+    assert!(status_before.contains("A  src/main.rs"));
+    assert!(status_before.contains("A  tests/test.rs"));
+
+    // Commit only src/
+    let output = git_commit_staged(dir, &["src", "-m", "Add main.rs"]);
+    assert!(output.status.success());
+
+    // Verify src/main.rs is no longer staged but tests/test.rs still is
+    let status_after = git(dir, &["status", "--porcelain"]);
+    assert!(
+        !status_after.contains("src/main.rs"),
+        "committed file should be unstaged: {status_after}"
+    );
+    assert!(
+        status_after.contains("A  tests/test.rs"),
+        "uncommitted file should still be staged: {status_after}"
+    );
 }

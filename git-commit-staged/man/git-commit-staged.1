@@ -1,0 +1,30 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH git-commit-staged 1  "git-commit-staged " 
+.SH NAME
+git\-commit\-staged \- Commit staged changes at specific paths only
+.SH SYNOPSIS
+\fBgit\-commit\-staged\fR [\fB\-n\fR|\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPATHS\fR> [\fIPASSTHROUGH_ARGS\fR] 
+.SH DESCRIPTION
+Unlike `git commit \-\- paths`, this commits from the index, not the working copy.
+.PP
+Arguments after \-\- are passed through to git commit,
+enabling \-m, \-\-amend, \-\-fixup, \-C, GPG signing, hooks, etc.
+.PP
+Examples:
+  git commit\-staged src/ \-\- \-m "Add feature"
+  git commit\-staged src/ tests/ \-\- \-\-amend
+  git commit\-staged . \-\- \-\-fixup HEAD~1
+.SH OPTIONS
+.TP
+\fB\-n\fR, \fB\-\-dry\-run\fR
+Show what would be committed without committing
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+<\fIPATHS\fR>
+Paths to commit (only staged changes at these paths)
+.TP
+[\fIPASSTHROUGH_ARGS\fR]
+Arguments to pass through to git commit

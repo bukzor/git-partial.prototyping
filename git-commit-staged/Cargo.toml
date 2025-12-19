@@ -9,7 +9,11 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "git-commit-staged"
-path = "src/main.rs"
+path = "src/staged/main.rs"
+
+[[bin]]
+name = "git-commit-working"
+path = "src/working/main.rs"
 
 [lints]
 workspace = true

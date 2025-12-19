@@ -37,7 +37,7 @@ brew install bukzor/tap/git-commit-staged
 
 ```bash
 cargo install --path git-commit-staged
-cp git-commit-staged/man/*.1 /usr/local/share/man/man1/
+ln -s "$PWD/git-commit-staged/man"/*.1 ~/.local/share/man/man1/
 ```
 
 ## Usage

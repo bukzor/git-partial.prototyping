@@ -18,24 +18,37 @@
 
 ## Proposed Solution
 
-Use `clap_mangen` crate to generate man page from existing clap definitions at build time.
+Use `clap_mangen` crate to generate man page at build time, commit to repo, distribute via Homebrew tap.
+
+**Why this approach:** Cargo doesn't support installing man pages (rust-lang/cargo#2729, open since 2016). The ecosystem convention is to generate and commit man pages, then let package managers (Homebrew, apt, etc.) install them properly.
 
 ## Implementation Steps
 
-- [ ] Add `clap_mangen` as build dependency
-- [ ] Create `build.rs` to generate man page
-- [ ] Add install target for man page (cargo doesn't handle this natively)
-- [ ] Document manual installation in README
+- [x] Add `clap_mangen` as build dependency
+- [x] Create `build.rs` to generate man page to `man/git-commit-staged.1`
+- [x] Commit generated man page to repo (follows dust, broot convention)
+- [ ] Add formula to `bukzor/tap` Homebrew tap
+- [x] Document in README: symlink to ~/.local/share/man for cargo install users
 
 ## Open Questions
 
-- Where should man page install to? (`~/.local/share/man/man1/`? system `/usr/share/man/man1/`?)
-- Should this be part of `cargo install` or separate step?
+~~Where should man page install to?~~ **Resolved:** Homebrew handles this. Cargo install users do manual cp.
+
+~~Should this be part of `cargo install`?~~ **Resolved:** No, cargo can't do this. Use Homebrew.
 
 ## Success Criteria
 
-- [ ] `git commit-staged --help` displays man page
-- [ ] Installation documented
+- [ ] `brew install bukzor/tap/git-commit-staged` installs binary + man page
+- [ ] `git commit-staged --help` displays man page (for brew users)
+- [ ] README documents both install methods
+
+## Effort Estimate
+
+~1-1.5 hours total:
+- clap_mangen + build.rs: 30 min
+- Generate and commit man page: 10 min  
+- Homebrew formula: 20 min
+- Testing: 15 min
 
 ## Notes
 

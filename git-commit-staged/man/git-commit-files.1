@@ -1,10 +1,10 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH git-commit-working 1  "git-commit-working " 
+.TH git-commit-files 1  "git-commit-files " 
 .SH NAME
-git\-commit\-working \- Stage and commit working tree changes at specific paths
+git\-commit\-files \- Stage and commit files at specific paths
 .SH SYNOPSIS
-\fBgit\-commit\-working\fR [\fB\-n\fR|\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPATHS\fR> [\fIPASSTHROUGH_ARGS\fR] 
+\fBgit\-commit\-files\fR [\fB\-n\fR|\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPATHS\fR> [\fIPASSTHROUGH_ARGS\fR] 
 .SH DESCRIPTION
 Stages paths from working tree, then commits those staged changes.
 .PP
@@ -14,9 +14,9 @@ Arguments after \-\- are passed through to git commit,
 enabling \-m, \-\-amend, \-\-fixup, \-C, GPG signing, hooks, etc.
 .PP
 Examples:
-  git commit\-working src/ \-\- \-m "Add feature"
-  git commit\-working src/ tests/ \-\- \-\-amend
-  git commit\-working . \-\- \-\-fixup HEAD~1
+  git commit\-files src/ \-\- \-m "Add feature"
+  git commit\-files src/ tests/ \-\- \-\-amend
+  git commit\-files . \-\- \-\-fixup HEAD~1
 .SH OPTIONS
 .TP
 \fB\-n\fR, \fB\-\-dry\-run\fR

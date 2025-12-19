@@ -1,6 +1,6 @@
-//! CLI integration tests for git-commit-working
+//! CLI integration tests for git-commit-files
 //!
-//! These tests run git-commit-working as a subprocess via `git -C <dir> commit-working`
+//! These tests run git-commit-files as a subprocess via `git -C <dir> commit-files`
 //! to test CLI-specific behavior: staging from working tree, argument parsing, etc.
 
 use std::fs;
@@ -26,9 +26,9 @@ fn git(dir: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&output.stdout).to_string()
 }
 
-/// Helper to run our binary via `git -C <dir> commit-working`
-fn git_commit_working(dir: &Path, args: &[&str]) -> std::process::Output {
-    let binary = env!("CARGO_BIN_EXE_git-commit-working");
+/// Helper to run our binary via `git -C <dir> commit-files`
+fn git_commit_files(dir: &Path, args: &[&str]) -> std::process::Output {
+    let binary = env!("CARGO_BIN_EXE_git-commit-files");
     let bin_dir = Path::new(binary).parent().unwrap();
     let path = std::env::var("PATH").unwrap_or_default();
     let new_path = format!("{}:{}", bin_dir.display(), path);
@@ -36,11 +36,11 @@ fn git_commit_working(dir: &Path, args: &[&str]) -> std::process::Output {
     Command::new("git")
         .arg("-C")
         .arg(dir)
-        .arg("commit-working")
+        .arg("commit-files")
         .args(args)
         .env("PATH", new_path)
         .output()
-        .expect("failed to execute git commit-working")
+        .expect("failed to execute git commit-files")
 }
 
 /// Create a test repo with an initial commit
@@ -73,8 +73,8 @@ fn commits_unstaged_working_tree_changes() {
     let status = git(dir, &["status", "--porcelain"]);
     assert!(status.contains("?? src/"));
 
-    // Commit using commit-working (stages then commits)
-    let output = git_commit_working(dir, &["src", "--", "-m", "Add main.rs"]);
+    // Commit using commit-files (stages then commits)
+    let output = git_commit_files(dir, &["src", "--", "-m", "Add main.rs"]);
     assert!(
         output.status.success(),
         "stderr: {}",
@@ -108,8 +108,8 @@ fn commits_modified_unstaged_file() {
     let status = git(dir, &["status", "--porcelain"]);
     assert!(status.contains(" M src/main.rs"));
 
-    // Commit using commit-working
-    let output = git_commit_working(dir, &["src", "--", "-m", "Update main.rs"]);
+    // Commit using commit-files
+    let output = git_commit_files(dir, &["src", "--", "-m", "Update main.rs"]);
     assert!(
         output.status.success(),
         "stderr: {}",
@@ -133,8 +133,8 @@ fn preserves_already_staged_changes_at_other_paths() {
     fs::write(dir.join("tests/test.rs"), "// test\n").unwrap();
     git(dir, &["add", "tests/test.rs"]);
 
-    // commit-working on src (not tests)
-    let output = git_commit_working(dir, &["src", "--", "-m", "Add main.rs"]);
+    // commit-files on src (not tests)
+    let output = git_commit_files(dir, &["src", "--", "-m", "Add main.rs"]);
     assert!(
         output.status.success(),
         "stderr: {}",
@@ -166,7 +166,7 @@ fn dry_run_shows_what_would_be_committed() {
     let log_before = git(dir, &["rev-list", "--count", "HEAD"]);
 
     // Dry run
-    let output = git_commit_working(dir, &["-n", "src", "--", "-m", "Dry run"]);
+    let output = git_commit_files(dir, &["-n", "src", "--", "-m", "Dry run"]);
     assert!(output.status.success());
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -193,8 +193,8 @@ fn amend_with_working_tree_changes() {
     // Modify without staging
     fs::write(dir.join("src/main.rs"), "fn main() { /* amended */ }\n").unwrap();
 
-    // Amend using commit-working
-    let output = git_commit_working(dir, &["src", "--", "--amend", "--no-edit"]);
+    // Amend using commit-files
+    let output = git_commit_files(dir, &["src", "--", "--amend", "--no-edit"]);
     assert!(
         output.status.success(),
         "stderr: {}",

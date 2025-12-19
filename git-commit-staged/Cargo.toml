@@ -12,8 +12,8 @@ name = "git-commit-staged"
 path = "src/staged/main.rs"
 
 [[bin]]
-name = "git-commit-working"
-path = "src/working/main.rs"
+name = "git-commit-files"
+path = "src/files/main.rs"
 
 [lints]
 workspace = true

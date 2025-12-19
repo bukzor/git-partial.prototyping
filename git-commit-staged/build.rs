@@ -5,8 +5,8 @@ use std::path::Path;
 #[path = "src/staged/cli.rs"]
 mod cli_staged;
 
-#[path = "src/working/cli.rs"]
-mod cli_working;
+#[path = "src/files/cli.rs"]
+mod cli_files;
 
 fn main() {
     let out_dir = Path::new("man");
@@ -19,10 +19,10 @@ fn main() {
     man.render(&mut buffer).expect("failed to render man page");
     fs::write(out_dir.join("git-commit-staged.1"), buffer).expect("failed to write man page");
 
-    // Generate man page for git-commit-working
-    let cmd = cli_working::Args::command();
+    // Generate man page for git-commit-files
+    let cmd = cli_files::Args::command();
     let man = clap_mangen::Man::new(cmd);
     let mut buffer = Vec::new();
     man.render(&mut buffer).expect("failed to render man page");
-    fs::write(out_dir.join("git-commit-working.1"), buffer).expect("failed to write man page");
+    fs::write(out_dir.join("git-commit-files.1"), buffer).expect("failed to write man page");
 }

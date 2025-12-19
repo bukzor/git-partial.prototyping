@@ -1,4 +1,4 @@
-//! CLI execution helpers shared between git-commit-staged and git-commit-working.
+//! CLI execution helpers shared between git-commit-staged and git-commit-files.
 
 use anyhow::{bail, Context, Result};
 use std::os::unix::process::CommandExt;

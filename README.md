@@ -15,12 +15,12 @@ git commit-staged src/ -- -m "Add feature"
 
 Unlike `git commit -- paths`, this commits from the index, not the working copy.
 
-### git-commit-working
+### git-commit-files
 
 Stage and commit working tree changes at specific paths in one step.
 
 ```bash
-git commit-working src/ -- -m "Add feature"
+git commit-files src/ -- -m "Add feature"
 ```
 
 Equivalent to `git add src/ && git commit-staged src/ -- -m "..."` but atomic.
@@ -46,14 +46,14 @@ Arguments after `--` pass through to `git commit`:
 
 ```bash
 git commit-staged src/ tests/ -- --amend
-git commit-working . -- --fixup HEAD~1
+git commit-files . -- --fixup HEAD~1
 ```
 
 Dry run to see what would be committed:
 
 ```bash
 git commit-staged -n src/
-git commit-working -n src/
+git commit-files -n src/
 ```
 
 ## Status

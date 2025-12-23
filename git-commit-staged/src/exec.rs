@@ -1,6 +1,7 @@
 //! CLI execution helpers shared between git-commit-staged and git-commit-files.
 
 use anyhow::{bail, Context, Result};
+use git2::{IndexAddOption, Repository};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -37,28 +38,35 @@ pub fn exec_git_commit(temp_index_path: &Path, passthrough_args: &[String]) -> R
     Err(err).context("failed to exec git commit")
 }
 
-/// Stage paths from working tree using git add.
+/// Stage paths from working tree using git2.
+///
+/// Uses `update_all` for tracked files (handles modifications and deletions)
+/// plus `add_all` for new untracked files.
 ///
 /// # Errors
-/// Returns an error if paths is empty, git add fails to run, or git add exits non-zero.
+/// Returns an error if paths is empty or staging fails.
 pub fn stage_paths(paths: &[PathBuf]) -> Result<()> {
     if paths.is_empty() {
         bail!("no paths specified");
     }
 
-    let mut cmd = Command::new("git");
-    cmd.arg("add");
-    cmd.arg("--");
-    for path in paths {
-        cmd.arg(path);
-    }
+    let repo = Repository::open_from_env().context("failed to open repository")?;
+    let mut index = repo.index().context("failed to get index")?;
 
-    let output = cmd.output().context("failed to run git add")?;
+    // Convert paths to pathspecs for git2
+    let pathspecs: Vec<&Path> = paths.iter().map(PathBuf::as_path).collect();
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("git add failed: {stderr}");
-    }
+    // update_all: sync index with working tree for tracked files (modifications + deletions)
+    index
+        .update_all(&pathspecs, None)
+        .context("failed to update index from working tree")?;
+
+    // add_all: also stage new untracked files
+    index
+        .add_all(&pathspecs, IndexAddOption::DEFAULT, None)
+        .context("failed to add paths to index")?;
+
+    index.write().context("failed to write index")?;
 
     Ok(())
 }

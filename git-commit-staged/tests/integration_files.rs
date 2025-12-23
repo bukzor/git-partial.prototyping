@@ -209,3 +209,46 @@ fn amend_with_working_tree_changes() {
     let content = git(dir, &["show", "HEAD:src/main.rs"]);
     assert!(content.contains("amended"));
 }
+
+#[test]
+fn commits_already_staged_deletion() {
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Create and commit a file
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/obsolete.rs"), "// to be deleted\n").unwrap();
+    git(dir, &["add", "src/obsolete.rs"]);
+    git(dir, &["commit", "-m", "Add obsolete file"]);
+
+    // Delete and stage the deletion
+    fs::remove_file(dir.join("src/obsolete.rs")).unwrap();
+    git(dir, &["add", "src/obsolete.rs"]);
+
+    // Verify it shows as staged deletion
+    let status = git(dir, &["status", "--porcelain"]);
+    assert!(
+        status.contains("D  src/obsolete.rs"),
+        "should show staged deletion: {status}"
+    );
+
+    // Commit using commit-files with exact file path (not directory)
+    // This reproduces the bug: git add fails on already-staged deleted file
+    let output = git_commit_files(dir, &["src/obsolete.rs", "--", "-m", "Remove obsolete file"]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Verify file is gone from HEAD
+    let show = git(dir, &["show", "--name-status", "--format="]);
+    assert!(
+        show.contains("D\tsrc/obsolete.rs"),
+        "should show deletion in commit: {show}"
+    );
+
+    // Working tree should be clean
+    let status = git(dir, &["status", "--porcelain"]);
+    assert!(status.trim().is_empty(), "status should be clean: {status}");
+}

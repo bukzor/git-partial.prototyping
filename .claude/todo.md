@@ -1,5 +1,7 @@
 # Current Work
 
+- [x] `commit-files` fails on deleted files — replaced shell-out `git add` with git2 `update_all` + `add_all`
+
 - [x] Close remaining `status: gap` mutations in `docs/dev/mutation-testing.kb/`
   - [x] `skip-index-write` - removed dead `unstage_paths` function, added `git_status_clean_after_commit` test
   - [x] Update 5 equivalent mutations to `status: equivalent`

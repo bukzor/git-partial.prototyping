@@ -14,4 +14,12 @@ See `docs/dev/design.kb/` for architectural decisions, constraints, and patterns
 
 ## Status
 
-Prototyping phase. Design captured, implementation not yet started.
+Prototyping phase. Core functionality implemented.
+
+## After Pushing
+
+Reinstall to update the binaries:
+
+```bash
+cargo install --path git-commit-staged
+```

@@ -6,6 +6,7 @@ use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::unglobbed_path::UnglobbedPath;
 use crate::StagedEntry;
 
 /// Print dry-run output showing files that would be committed.
@@ -46,14 +47,14 @@ pub fn exec_git_commit(temp_index_path: &Path, passthrough_args: &[String]) -> R
 ///
 /// # Errors
 /// Returns an error if staged changes would be lost, or if git operations fail.
-pub fn check_no_staged_changes(paths: &[PathBuf]) -> Result<()> {
+pub fn check_no_staged_changes(paths: &[UnglobbedPath]) -> Result<()> {
     use std::collections::HashSet;
 
     let repo = Repository::open_from_env().context("failed to open repository")?;
     let index = repo.index().context("failed to get index")?;
     let head = repo.head()?.peel_to_tree()?;
 
-    let matches = |p: &Path| paths.iter().any(|t| p.starts_with(t));
+    let matches = |p: &Path| paths.iter().any(|t| p.starts_with(t.as_ref()));
 
     let staged: HashSet<PathBuf> = repo
         .diff_tree_to_index(Some(&head), Some(&index), None)?
@@ -93,7 +94,7 @@ pub fn check_no_staged_changes(paths: &[PathBuf]) -> Result<()> {
 ///
 /// # Errors
 /// Returns an error if paths is empty or staging fails.
-pub fn stage_paths(paths: &[PathBuf]) -> Result<()> {
+pub fn stage_paths(paths: &[UnglobbedPath]) -> Result<()> {
     if paths.is_empty() {
         bail!("no paths specified");
     }
@@ -101,17 +102,14 @@ pub fn stage_paths(paths: &[PathBuf]) -> Result<()> {
     let repo = Repository::open_from_env().context("failed to open repository")?;
     let mut index = repo.index().context("failed to get index")?;
 
-    // Convert paths to pathspecs for git2
-    let pathspecs: Vec<&Path> = paths.iter().map(PathBuf::as_path).collect();
-
     // update_all: sync index with working tree for tracked files (modifications + deletions)
     index
-        .update_all(&pathspecs, None)
+        .update_all(paths, None)
         .context("failed to update index from working tree")?;
 
     // add_all: also stage new untracked files
     index
-        .add_all(&pathspecs, IndexAddOption::DEFAULT, None)
+        .add_all(paths, IndexAddOption::DEFAULT, None)
         .context("failed to add paths to index")?;
 
     index.write().context("failed to write index")?;

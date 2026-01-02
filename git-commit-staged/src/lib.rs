@@ -22,6 +22,7 @@ use std::process::Command;
 
 pub mod exec;
 pub mod index;
+pub mod unglobbed_path;
 pub mod prepare;
 
 #[cfg(test)]

@@ -30,8 +30,8 @@ use crate::{PrepareResult, StagedEntry};
 /// - No HEAD commit exists (empty repo)
 /// - No staged changes exist at the specified paths
 /// - Git operations fail (index read, tree write)
-pub fn prepare_staged_commit(
-    paths: &[PathBuf],
+pub fn prepare_staged_commit<P: AsRef<Path>>(
+    paths: &[P],
     directory: &Path,
     dry_run: bool,
 ) -> Result<PrepareResult> {
@@ -77,8 +77,8 @@ pub fn prepare_staged_commit(
 /// - Paths are resolved relative to `scope_root` (the -C directory)
 /// - Paths must stay within `scope_root` (no escaping via ..)
 /// - Returns paths relative to `repo_root` for index comparison
-fn resolve_paths(
-    user_paths: &[PathBuf],
+fn resolve_paths<P: AsRef<Path>>(
+    user_paths: &[P],
     scope_root: &Path,
     repo_root: &Path,
 ) -> Result<Vec<PathBuf>> {
@@ -86,7 +86,7 @@ fn resolve_paths(
         .iter()
         .map(|user_path| {
             // Make absolute by joining with scope_root
-            let absolute = scope_root.join(user_path);
+            let absolute = scope_root.join(user_path.as_ref());
 
             // Normalize (handles . and ..)
             let normalized = gix_path::normalize(Cow::Owned(absolute), scope_root)
@@ -96,7 +96,7 @@ fn resolve_paths(
             if !normalized.starts_with(scope_root) {
                 bail!(
                     "{} escapes scope {}",
-                    user_path.display(),
+                    user_path.as_ref().display(),
                     scope_root.display()
                 );
             }
@@ -108,7 +108,7 @@ fn resolve_paths(
                 .with_context(|| {
                     format!(
                         "{} is outside repository {}",
-                        user_path.display(),
+                        user_path.as_ref().display(),
                         repo_root.display()
                     )
                 })

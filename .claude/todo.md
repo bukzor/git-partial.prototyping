@@ -5,6 +5,10 @@
 - [x] `commit-files`: bail if index differs from both HEAD and working tree (three-version case)
   - Prevents silent destruction of staged changes
   - Helpful error message suggesting `git commit-staged` or `git reset`
+- [x] `commit-files`: support directory paths as input (5ad4370)
+  - Added `UnglobbedPath` newtype that expands directories to files at construction
+  - Implements `IntoCString` for direct use with git2's `add_all`/`update_all`
+  - Design discussion: chose eager expansion over glob conversion for type safety
 
 # Future
 

@@ -38,6 +38,54 @@ pub fn exec_git_commit(temp_index_path: &Path, passthrough_args: &[String]) -> R
     Err(err).context("failed to exec git commit")
 }
 
+/// Check that no staged changes would be destroyed by commit-files.
+///
+/// Bails if index differs from BOTH HEAD and working tree at any path.
+/// If index matches HEAD (nothing staged) or matches working tree
+/// (already staged what we're committing), we're fine.
+///
+/// # Errors
+/// Returns an error if staged changes would be lost, or if git operations fail.
+pub fn check_no_staged_changes(paths: &[PathBuf]) -> Result<()> {
+    use std::collections::HashSet;
+
+    let repo = Repository::open_from_env().context("failed to open repository")?;
+    let index = repo.index().context("failed to get index")?;
+    let head = repo.head()?.peel_to_tree()?;
+
+    let matches = |p: &Path| paths.iter().any(|t| p.starts_with(t));
+
+    let staged: HashSet<PathBuf> = repo
+        .diff_tree_to_index(Some(&head), Some(&index), None)?
+        .deltas()
+        .filter_map(|d| d.new_file().path())
+        .filter(|p| matches(p))
+        .map(Path::to_path_buf)
+        .collect();
+
+    let unstaged: HashSet<PathBuf> = repo
+        .diff_index_to_workdir(Some(&index), None)?
+        .deltas()
+        .filter_map(|d| d.new_file().path())
+        .filter(|p| matches(p))
+        .map(Path::to_path_buf)
+        .collect();
+
+    let conflicts: Vec<_> = staged.intersection(&unstaged).collect();
+    if !conflicts.is_empty() {
+        let list = conflicts.iter().map(|p| format!("  {}", p.display())).collect::<Vec<_>>().join("\n");
+        bail!(
+            "staged changes at these paths differ from working tree:\n{list}\n\n\
+             These would be overwritten. Either:\n  \
+               git commit-staged <paths>   # commit staged changes first\n  \
+               git reset <paths>           # discard staged changes\n\
+             Then retry."
+        );
+    }
+
+    Ok(())
+}
+
 /// Stage paths from working tree using git2.
 ///
 /// Uses `update_all` for tracked files (handles modifications and deletions)

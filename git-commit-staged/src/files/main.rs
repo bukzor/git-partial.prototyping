@@ -4,13 +4,16 @@ use std::path::Path;
 
 mod cli;
 use cli::Args;
-use git_commit_staged::exec::{exec_git_commit, print_dry_run, stage_paths};
+use git_commit_staged::exec::{check_no_staged_changes, exec_git_commit, print_dry_run, stage_paths};
 use git_commit_staged::prepare_staged_commit;
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    // Stage the paths from working tree first
+    // Bail if staging would destroy existing staged changes
+    check_no_staged_changes(&args.paths)?;
+
+    // Stage the paths from working tree
     stage_paths(&args.paths)?;
 
     let result = prepare_staged_commit(&args.paths, Path::new("."), args.dry_run)?;

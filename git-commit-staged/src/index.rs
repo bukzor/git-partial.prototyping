@@ -68,3 +68,12 @@ pub fn write_temp_index(repo: &Repository, entries: &[StagedEntry]) -> Result<Pa
 
     Ok(temp_index_path)
 }
+
+/// Convenience wrapper that opens repo from environment.
+///
+/// # Errors
+/// Returns an error if repository cannot be opened or `write_temp_index` fails.
+pub fn write_temp_index_for_paths(entries: &[StagedEntry]) -> Result<PathBuf> {
+    let repo = Repository::open_from_env().context("failed to open repository")?;
+    write_temp_index(&repo, entries)
+}

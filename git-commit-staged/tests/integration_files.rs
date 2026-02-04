@@ -9,6 +9,56 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
+/// Test repo wrapper that asserts no lock/temp files on drop
+struct TestRepo {
+    tmp: TempDir,
+}
+
+impl TestRepo {
+    fn path(&self) -> &Path {
+        self.tmp.path()
+    }
+
+    fn git_dir(&self) -> std::path::PathBuf {
+        let output = Command::new("git")
+            .args(["rev-parse", "--git-dir"])
+            .current_dir(self.path())
+            .output()
+            .expect("failed to run git rev-parse");
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        self.path().join(path)
+    }
+}
+
+impl Drop for TestRepo {
+    fn drop(&mut self) {
+        // Skip assertions if we're already panicking
+        if std::thread::panicking() {
+            return;
+        }
+
+        let git_dir = self.git_dir();
+
+        for entry in fs::read_dir(&git_dir).expect("failed to read .git dir") {
+            let entry = entry.expect("failed to read dir entry");
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+
+            // No lock files of any kind
+            assert!(
+                !name.ends_with(".lock"),
+                "lock file should not exist: {name}"
+            );
+
+            // No temp index files
+            assert!(
+                !name.starts_with("index.") || name == "index",
+                "temp index file should not exist: {name}"
+            );
+        }
+    }
+}
+
 /// Helper to run git commands in a directory
 fn git(dir: &Path, args: &[&str]) -> String {
     let output = Command::new("git")
@@ -44,7 +94,7 @@ fn git_commit_files(dir: &Path, args: &[&str]) -> std::process::Output {
 }
 
 /// Create a test repo with an initial commit
-fn setup_repo() -> TempDir {
+fn setup_repo() -> TestRepo {
     let tmp = TempDir::new().expect("failed to create temp dir");
     let dir = tmp.path();
 
@@ -57,7 +107,7 @@ fn setup_repo() -> TempDir {
     git(dir, &["add", "README.md"]);
     git(dir, &["commit", "-m", "Initial commit"]);
 
-    tmp
+    TestRepo { tmp }
 }
 
 #[test]
@@ -287,4 +337,34 @@ fn bails_when_staged_changes_differ_from_working_tree() {
         stderr.contains("staged changes") && stderr.contains("differ from working tree"),
         "expected helpful error message: {stderr}"
     );
+}
+
+#[test]
+fn fails_when_lock_is_held() {
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Create unstaged file
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+
+    // Manually hold the lock
+    let lock_path = tmp.git_dir().join("index.lock");
+    fs::write(&lock_path, "").unwrap();
+
+    // commit-files should fail gracefully
+    let output = git_commit_files(dir, &["src", "--", "-m", "Should fail"]);
+    assert!(
+        !output.status.success(),
+        "should have failed due to lock"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("lock") || stderr.contains("locked"),
+        "expected lock-related error message: {stderr}"
+    );
+
+    // Clean up the lock we created (so TestRepo::Drop assertion passes)
+    fs::remove_file(&lock_path).unwrap();
 }

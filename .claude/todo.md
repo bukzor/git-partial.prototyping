@@ -1,21 +1,18 @@
 # Current Work
 
+- [ ] Add `--version` flag with embedded git commit hash
+  - Makes debugging easier — currently inferring binary version from timestamps
+  - Use `built` crate or build.rs with `git rev-parse HEAD`
+
 - [x] `commit-files` should handle untracked files — fixed by `update_all` + `add_all` (b32f9f9)
 - [x] `commit-files` fails on deleted files — replaced shell-out `git add` with git2 `update_all` + `add_all`
 - [x] `commit-files`: bail if index differs from both HEAD and working tree (three-version case)
   - Prevents silent destruction of staged changes
   - Helpful error message suggesting `git commit-staged` or `git reset`
 - [x] `commit-files`: support directory paths as input (5ad4370)
-  - Added `UnglobbedPath` newtype that expands directories to files at construction
-  - Implements `IntoCString` for direct use with git2's `add_all`/`update_all`
-  - Design discussion: chose eager expansion over glob conversion for type safety
+- [x] Locking for multi-agent scenarios — see devlog 2026-02-04
 
 # Future
-
-- [ ] Locking for multi-agent scenarios
-  - Hold `.git/index.lock` during check + commit for atomicity
-  - Use `git hook run` + `git commit-tree` instead of `exec git commit`
-  - Benefits both `commit-files` and `commit-staged`
 
 - [x] Close remaining `status: gap` mutations in `docs/dev/mutation-testing.kb/`
   - [x] `skip-index-write` - removed dead `unstage_paths` function, added `git_status_clean_after_commit` test

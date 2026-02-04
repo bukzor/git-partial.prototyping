@@ -20,10 +20,12 @@ use git2::Oid;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+pub mod commit;
 pub mod exec;
 pub mod index;
-pub mod unglobbed_path;
+pub mod lock;
 pub mod prepare;
+pub mod unglobbed_path;
 
 #[cfg(test)]
 mod tests;

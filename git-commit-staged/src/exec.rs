@@ -1,7 +1,7 @@
 //! CLI execution helpers shared between git-commit-staged and git-commit-files.
 
 use anyhow::{bail, Context, Result};
-use git2::{IndexAddOption, Repository};
+use git2::{Index, IndexAddOption, Repository};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -87,14 +87,28 @@ pub fn check_no_staged_changes(paths: &[UnglobbedPath]) -> Result<()> {
     Ok(())
 }
 
-/// Stage paths from working tree using git2.
+/// Result of staging paths to a temp index.
+pub struct StageResult {
+    /// Path to temp index with staged content
+    pub temp_index_path: PathBuf,
+    /// Path to real index (for rename)
+    pub real_index_path: PathBuf,
+    /// Entries that were staged (diff from HEAD)
+    pub staged_entries: Vec<StagedEntry>,
+}
+
+/// Stage paths from working tree to a temp index.
 ///
 /// Uses `update_all` for tracked files (handles modifications and deletions)
 /// plus `add_all` for new untracked files.
 ///
+/// Returns the temp index path and staged entries. Caller decides whether to:
+/// - Rename temp → real (commit path)
+/// - Delete temp (dry-run path)
+///
 /// # Errors
 /// Returns an error if paths is empty or staging fails.
-pub fn stage_paths(paths: &[UnglobbedPath]) -> Result<()> {
+pub fn stage_paths_to_temp(paths: &[UnglobbedPath]) -> Result<StageResult> {
     if paths.is_empty() {
         bail!("no paths specified");
     }
@@ -112,7 +126,98 @@ pub fn stage_paths(paths: &[UnglobbedPath]) -> Result<()> {
         .add_all(paths, IndexAddOption::DEFAULT, None)
         .context("failed to add paths to index")?;
 
-    index.write().context("failed to write index")?;
+    // Write to temp path (avoids conflict with index.lock we hold)
+    let git_dir = repo.path();
+    let temp_path = git_dir.join(format!("index.stage.{}", std::process::id()));
 
+    let mut temp_index =
+        Index::open(&temp_path).context("failed to create temp index for staging")?;
+
+    for entry in index.iter() {
+        temp_index.add(&entry).with_context(|| {
+            format!(
+                "failed to copy entry {}",
+                String::from_utf8_lossy(&entry.path)
+            )
+        })?;
+    }
+
+    temp_index.write().context("failed to write temp index")?;
+
+    // Find what was staged (diff HEAD to temp index)
+    let head_tree = repo
+        .head()
+        .context("failed to get HEAD")?
+        .peel_to_tree()
+        .context("failed to peel HEAD to tree")?;
+
+    let staged_entries = find_staged_in_index(&repo, &temp_index, &head_tree, paths)?;
+
+    Ok(StageResult {
+        temp_index_path: temp_path,
+        real_index_path: git_dir.join("index"),
+        staged_entries,
+    })
+}
+
+/// Find entries in an index that differ from HEAD at the given paths.
+fn find_staged_in_index(
+    repo: &Repository,
+    index: &Index,
+    head_tree: &git2::Tree,
+    paths: &[UnglobbedPath],
+) -> Result<Vec<StagedEntry>> {
+    let matches = |p: &Path| paths.iter().any(|t| p.starts_with(t.as_ref()));
+
+    let diff = repo
+        .diff_tree_to_index(Some(head_tree), Some(index), None)
+        .context("failed to diff HEAD to index")?;
+
+    let mut staged = Vec::new();
+
+    for delta in diff.deltas() {
+        let path = delta.new_file().path().context("diff delta has no path")?;
+
+        if !matches(path) {
+            continue;
+        }
+
+        let path_str = path
+            .to_str()
+            .context("path is not valid UTF-8")?
+            .to_owned();
+
+        let entry = if delta.status() == git2::Delta::Deleted {
+            (path_str, None)
+        } else {
+            let f = delta.new_file();
+            (path_str, Some((f.id(), u32::from(f.mode()))))
+        };
+
+        staged.push(entry);
+    }
+
+    Ok(staged)
+}
+
+/// Commit the temp index by renaming it to the real index.
+///
+/// # Errors
+/// Returns an error if the rename fails.
+pub fn commit_staged_index(stage_result: &StageResult) -> Result<()> {
+    std::fs::rename(&stage_result.temp_index_path, &stage_result.real_index_path)
+        .context("failed to rename temp index to real index")
+}
+
+/// Discard the temp index (for dry-run).
+///
+/// # Errors
+/// Returns an error if the temp index exists but cannot be removed.
+pub fn discard_staged_index(stage_result: &StageResult) -> Result<()> {
+    if stage_result.temp_index_path.exists() {
+        std::fs::remove_file(&stage_result.temp_index_path)
+            .context("failed to remove temp index")?;
+    }
     Ok(())
 }
+

@@ -1,11 +1,15 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
-use std::path::Path;
 
 mod cli;
 use cli::Args;
-use git_commit_staged::exec::{check_no_staged_changes, exec_git_commit, print_dry_run, stage_paths};
-use git_commit_staged::prepare_staged_commit;
+use git_commit_staged::commit::do_commit;
+use git_commit_staged::exec::{
+    check_no_staged_changes, commit_staged_index, discard_staged_index, print_dry_run,
+    stage_paths_to_temp,
+};
+use git_commit_staged::index::write_temp_index_for_paths;
+use git_commit_staged::lock::IndexLock;
 use git_commit_staged::unglobbed_path::UnglobbedPath;
 
 fn main() -> Result<()> {
@@ -14,25 +18,42 @@ fn main() -> Result<()> {
     // Expand directories to files
     let files = UnglobbedPath::from_paths(&args.paths);
     if files.is_empty() {
-        anyhow::bail!("no files found at specified paths");
+        bail!("no files found at specified paths");
     }
+
+    // Acquire lock before reading any state (skip for dry-run)
+    let _lock = if args.dry_run {
+        None
+    } else {
+        Some(IndexLock::acquire()?)
+    };
 
     // Bail if staging would destroy existing staged changes
     check_no_staged_changes(&files)?;
 
-    // Stage the files from working tree
-    stage_paths(&files)?;
+    // Stage working tree to temp index (same code path for dry-run and real)
+    let stage_result = stage_paths_to_temp(&files)?;
 
-    let result = prepare_staged_commit(&files, Path::new("."), args.dry_run)?;
+    if stage_result.staged_entries.is_empty() {
+        discard_staged_index(&stage_result)?;
+        bail!("no changes to commit at specified paths");
+    }
 
     if args.dry_run {
-        print_dry_run(&result.staged_entries);
+        print_dry_run(&stage_result.staged_entries);
+        discard_staged_index(&stage_result)?;
         return Ok(());
     }
 
-    let temp_index_path = result
-        .temp_index_path
-        .expect("non-dry-run should have temp index");
+    // Commit path: rename temp → real index
+    commit_staged_index(&stage_result)?;
 
-    exec_git_commit(&temp_index_path, &args.passthrough_args)
+    // Create temp index for commit (HEAD + staged entries)
+    let commit_index_path = write_temp_index_for_paths(&stage_result.staged_entries)?;
+
+    // Lock held throughout - do_commit expects caller to hold it
+    let output = do_commit(&commit_index_path, &args.passthrough_args)?;
+    println!("[commit-files {}]", &output.commit_sha[..7]);
+
+    Ok(())
 }

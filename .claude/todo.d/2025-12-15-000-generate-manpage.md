@@ -27,7 +27,7 @@ Use `clap_mangen` crate to generate man page at build time, commit to repo, dist
 - [x] Add `clap_mangen` as build dependency
 - [x] Create `build.rs` to generate man page to `man/git-commit-staged.1`
 - [x] Commit generated man page to repo (follows dust, broot convention)
-- [ ] Add formula to `bukzor/tap` Homebrew tap
+- [x] Add formula to source repo (Formula/git-commit-staged.rb)
 - [x] Document in README: symlink to ~/.local/share/man for cargo install users
 
 ## Open Questions
@@ -36,11 +36,13 @@ Use `clap_mangen` crate to generate man page at build time, commit to repo, dist
 
 ~~Should this be part of `cargo install`?~~ **Resolved:** No, cargo can't do this. Use Homebrew.
 
+~~Separate tap repo or self-hosted?~~ **Resolved (2026-02-04):** Self-hosted in source repo. Formula lives at `Formula/git-commit-staged.rb`. Users tap with explicit URL.
+
 ## Success Criteria
 
-- [ ] `brew install bukzor/tap/git-commit-staged` installs binary + man page
-- [ ] `git commit-staged --help` displays man page (for brew users)
-- [ ] README documents both install methods
+- [x] `brew install --HEAD bukzor/git-partial/git-commit-staged` installs binary + man page
+- [x] `git commit-staged --help` displays man page (for brew users)
+- [x] README documents both install methods
 
 ## Effort Estimate
 

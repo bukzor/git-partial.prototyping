@@ -1,10 +1,10 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH git-commit-files 1  "git-commit-files " 
+.TH git-commit-files 1  "git-commit-files 0.1.0" 
 .SH NAME
 git\-commit\-files \- Stage and commit files at specific paths
 .SH SYNOPSIS
-\fBgit\-commit\-files\fR [\fB\-n\fR|\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIPATHS\fR> [\fIPASSTHROUGH_ARGS\fR] 
+\fBgit\-commit\-files\fR [\fB\-n\fR|\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIPATHS\fR> [\fIPASSTHROUGH_ARGS\fR] 
 .SH DESCRIPTION
 Stages paths from working tree, then commits those staged changes.
 .PP
@@ -25,8 +25,13 @@ Show what would be committed without committing
 \fB\-h\fR, \fB\-\-help\fR
 Print help (see a summary with \*(Aq\-h\*(Aq)
 .TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.TP
 <\fIPATHS\fR>
 Paths to stage and commit
 .TP
 [\fIPASSTHROUGH_ARGS\fR]
 Arguments to pass through to git commit
+.SH VERSION
+v0.1.0

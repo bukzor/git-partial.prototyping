@@ -368,3 +368,45 @@ fn fails_when_lock_is_held() {
     // Clean up the lock we created (so TestRepo::Drop assertion passes)
     fs::remove_file(&lock_path).unwrap();
 }
+
+#[test]
+fn version_includes_git_hash() {
+    let output = Command::new(env!("CARGO_BIN_EXE_git-commit-files"))
+        .arg("--version")
+        .output()
+        .expect("failed to run --version");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Should match pattern: "git-commit-files X.Y.Z (abcdef1)"
+    assert!(
+        stdout.contains("git-commit-files") && stdout.contains("("),
+        "version should include git hash: {stdout}"
+    );
+}
+
+#[test]
+fn commits_from_subdirectory() {
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    // Create nested structure: apps/myapp/src/main.rs
+    fs::create_dir_all(dir.join("apps/myapp/src")).unwrap();
+    fs::write(dir.join("apps/myapp/src/main.rs"), "fn main() {}\n").unwrap();
+
+    // Run commit-files from the subdirectory
+    let subdir = dir.join("apps/myapp");
+    let output = git_commit_files(&subdir, &["src/main.rs", "--", "-m", "Add main.rs from subdir"]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Verify commit contains the correct path
+    let show = git(dir, &["show", "--name-only", "--format="]);
+    assert!(
+        show.contains("apps/myapp/src/main.rs"),
+        "expected repo-relative path in commit: {show}"
+    );
+}

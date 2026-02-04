@@ -1,9 +1,6 @@
 # Current Work
 
-- [ ] Add `--version` flag with embedded git commit hash
-  - Makes debugging easier — currently inferring binary version from timestamps
-  - Use `built` crate or build.rs with `git rev-parse HEAD`
-
+- [x] Add `--version` flag with embedded git commit hash
 - [x] `commit-files` should handle untracked files — fixed by `update_all` + `add_all` (b32f9f9)
 - [x] `commit-files` fails on deleted files — replaced shell-out `git add` with git2 `update_all` + `add_all`
 - [x] `commit-files`: bail if index differs from both HEAD and working tree (three-version case)

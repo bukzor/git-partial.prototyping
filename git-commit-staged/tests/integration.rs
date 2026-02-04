@@ -264,3 +264,19 @@ fn reuse_message_with_c_flag() {
     let log = git(dir, &["log", "--format=%s", "-1"]);
     assert_eq!(log.trim(), "Original message to reuse");
 }
+
+#[test]
+fn version_includes_git_hash() {
+    let output = Command::new(env!("CARGO_BIN_EXE_git-commit-staged"))
+        .arg("--version")
+        .output()
+        .expect("failed to run --version");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Should match pattern: "git-commit-staged X.Y.Z (abcdef1)"
+    assert!(
+        stdout.contains("git-commit-staged") && stdout.contains("("),
+        "version should include git hash: {stdout}"
+    );
+}

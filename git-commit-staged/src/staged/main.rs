@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches};
 use std::path::Path;
 
 mod cli;
@@ -9,8 +9,10 @@ use git_commit_staged::exec::print_dry_run;
 use git_commit_staged::lock::IndexLock;
 use git_commit_staged::prepare_staged_commit;
 
+const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")");
+
 fn main() -> Result<()> {
-    let args = Args::parse();
+    let args = Args::from_arg_matches(&Args::command().version(VERSION).get_matches())?;
 
     // Acquire lock before reading any state (skip for dry-run)
     let _lock = if args.dry_run {

@@ -32,7 +32,8 @@ Unified flow ensures dry-run uses same staging code as real execution.
 
 39 total (was 31). All pass, clippy clean.
 
-## Next
+## Follow-up (same session)
 
-- Reinstall binaries: `cargo install --path git-commit-staged`
-- Verify the "no staged changes" error is fixed in practice
+- Fixed subdirectory path resolution in `stage_paths_to_temp`
+- Added `--version` flag with embedded git hash (e.g., `0.1.0 (a105291)`)
+- 42 tests total

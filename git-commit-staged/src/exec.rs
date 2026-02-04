@@ -109,6 +109,8 @@ pub struct StageResult {
 /// # Errors
 /// Returns an error if paths is empty or staging fails.
 pub fn stage_paths_to_temp(paths: &[UnglobbedPath]) -> Result<StageResult> {
+    use std::borrow::Cow;
+
     if paths.is_empty() {
         bail!("no paths specified");
     }
@@ -116,14 +118,34 @@ pub fn stage_paths_to_temp(paths: &[UnglobbedPath]) -> Result<StageResult> {
     let repo = Repository::open_from_env().context("failed to open repository")?;
     let mut index = repo.index().context("failed to get index")?;
 
+    // Resolve user paths to repo-relative paths
+    let cwd = std::env::current_dir().context("failed to get current directory")?;
+    let repo_root = repo
+        .workdir()
+        .context("repository has no workdir")?;
+    let repo_root = std::fs::canonicalize(repo_root).context("failed to canonicalize repo root")?;
+
+    let repo_relative_paths: Vec<PathBuf> = paths
+        .iter()
+        .map(|p| {
+            let absolute = cwd.join(p.as_ref());
+            let normalized = gix_path::normalize(Cow::Owned(absolute), &cwd)
+                .context("path normalization failed")?;
+            normalized
+                .strip_prefix(&repo_root)
+                .map(Path::to_path_buf)
+                .with_context(|| format!("{} is outside repository", p.as_ref().display()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
     // update_all: sync index with working tree for tracked files (modifications + deletions)
     index
-        .update_all(paths, None)
+        .update_all(&repo_relative_paths, None)
         .context("failed to update index from working tree")?;
 
     // add_all: also stage new untracked files
     index
-        .add_all(paths, IndexAddOption::DEFAULT, None)
+        .add_all(&repo_relative_paths, IndexAddOption::DEFAULT, None)
         .context("failed to add paths to index")?;
 
     // Write to temp path (avoids conflict with index.lock we hold)
@@ -151,7 +173,7 @@ pub fn stage_paths_to_temp(paths: &[UnglobbedPath]) -> Result<StageResult> {
         .peel_to_tree()
         .context("failed to peel HEAD to tree")?;
 
-    let staged_entries = find_staged_in_index(&repo, &temp_index, &head_tree, paths)?;
+    let staged_entries = find_staged_in_index(&repo, &temp_index, &head_tree, &repo_relative_paths)?;
 
     Ok(StageResult {
         temp_index_path: temp_path,
@@ -165,9 +187,9 @@ fn find_staged_in_index(
     repo: &Repository,
     index: &Index,
     head_tree: &git2::Tree,
-    paths: &[UnglobbedPath],
+    paths: &[PathBuf],
 ) -> Result<Vec<StagedEntry>> {
-    let matches = |p: &Path| paths.iter().any(|t| p.starts_with(t.as_ref()));
+    let matches = |p: &Path| paths.iter().any(|t| p.starts_with(t));
 
     let diff = repo
         .diff_tree_to_index(Some(head_tree), Some(index), None)

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(name = "git-commit-staged")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "Commit staged changes at specific paths only")]
 #[command(
     long_about = "Unlike `git commit -- paths`, this commits from the index, not the working copy.\n\n\

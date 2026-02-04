@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches};
 
 mod cli;
 use cli::Args;
@@ -12,8 +12,10 @@ use git_commit_staged::index::write_temp_index_for_paths;
 use git_commit_staged::lock::IndexLock;
 use git_commit_staged::unglobbed_path::UnglobbedPath;
 
+const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")");
+
 fn main() -> Result<()> {
-    let args = Args::parse();
+    let args = Args::from_arg_matches(&Args::command().version(VERSION).get_matches())?;
 
     // Expand directories to files
     let files = UnglobbedPath::from_paths(&args.paths);

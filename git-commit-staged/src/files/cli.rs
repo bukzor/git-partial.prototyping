@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(name = "git-commit-files")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "Stage and commit files at specific paths")]
 #[command(
     long_about = "Stages paths from working tree, then commits those staged changes.\n\n\

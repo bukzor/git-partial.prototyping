@@ -72,8 +72,9 @@ pub fn check_no_staged_changes(paths: &[UnglobbedPath]) -> Result<()> {
         .map(Path::to_path_buf)
         .collect();
 
-    let conflicts: Vec<_> = staged.intersection(&unstaged).collect();
+    let mut conflicts: Vec<_> = staged.intersection(&unstaged).collect();
     if !conflicts.is_empty() {
+        conflicts.sort();
         let list = conflicts.iter().map(|p| format!("  {}", p.display())).collect::<Vec<_>>().join("\n");
         bail!(
             "staged changes at these paths differ from working tree:\n{list}\n\n\

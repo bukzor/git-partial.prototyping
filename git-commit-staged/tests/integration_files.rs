@@ -308,22 +308,24 @@ fn bails_when_staged_changes_differ_from_working_tree() {
     let tmp = setup_repo();
     let dir = tmp.path();
 
-    // Create and commit a file
+    // Create and commit multiple files with names that sort differently
+    // than typical filesystem or hash iteration order
     fs::create_dir_all(dir.join("src")).unwrap();
-    fs::write(dir.join("src/main.rs"), "v0\n").unwrap();
-    git(dir, &["add", "src/main.rs"]);
-    git(dir, &["commit", "-m", "Add main.rs"]);
+    let files = ["src/zebra.rs", "src/alpha.rs", "src/middle.rs"];
+    for f in &files {
+        fs::write(dir.join(f), "v0\n").unwrap();
+    }
+    git(dir, &["add", "src"]);
+    git(dir, &["commit", "-m", "Add files"]);
 
-    // Stage v1
-    fs::write(dir.join("src/main.rs"), "v1\n").unwrap();
-    git(dir, &["add", "src/main.rs"]);
-
-    // Working tree has v2
-    fs::write(dir.join("src/main.rs"), "v2\n").unwrap();
-
-    // Verify status shows both staged and unstaged (MM)
-    let status = git(dir, &["status", "--porcelain"]);
-    assert!(status.contains("MM src/main.rs"), "expected MM status: {status}");
+    // Stage v1, then write v2 to working tree (creates MM state)
+    for f in &files {
+        fs::write(dir.join(f), "v1\n").unwrap();
+    }
+    git(dir, &["add", "src"]);
+    for f in &files {
+        fs::write(dir.join(f), "v2\n").unwrap();
+    }
 
     // commit-files should bail
     let output = git_commit_files(dir, &["src", "--", "-m", "Should fail"]);
@@ -336,6 +338,15 @@ fn bails_when_staged_changes_differ_from_working_tree() {
     assert!(
         stderr.contains("staged changes") && stderr.contains("differ from working tree"),
         "expected helpful error message: {stderr}"
+    );
+
+    // Paths in error message must be sorted
+    let alpha_pos = stderr.find("src/alpha.rs").expect("missing alpha");
+    let middle_pos = stderr.find("src/middle.rs").expect("missing middle");
+    let zebra_pos = stderr.find("src/zebra.rs").expect("missing zebra");
+    assert!(
+        alpha_pos < middle_pos && middle_pos < zebra_pos,
+        "conflict paths should be sorted: {stderr}"
     );
 }
 

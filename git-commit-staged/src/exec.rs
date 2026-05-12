@@ -1,12 +1,11 @@
 //! CLI execution helpers shared between git-commit-staged and git-commit-files.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use git2::{Index, IndexAddOption, Repository};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::unglobbed_path::UnglobbedPath;
 use crate::StagedEntry;
 
 /// Print dry-run output showing files that would be committed.
@@ -47,14 +46,14 @@ pub fn exec_git_commit(temp_index_path: &Path, passthrough_args: &[String]) -> R
 ///
 /// # Errors
 /// Returns an error if staged changes would be lost, or if git operations fail.
-pub fn check_no_staged_changes(paths: &[UnglobbedPath]) -> Result<()> {
+pub fn check_no_staged_changes(paths: &[PathBuf]) -> Result<()> {
     use std::collections::HashSet;
 
     let repo = Repository::open_from_env().context("failed to open repository")?;
     let index = repo.index().context("failed to get index")?;
     let head = repo.head()?.peel_to_tree()?;
 
-    let matches = |p: &Path| paths.iter().any(|t| p.starts_with(t.as_ref()));
+    let matches = |p: &Path| paths.iter().any(|t| p.starts_with(t));
 
     let staged: HashSet<PathBuf> = repo
         .diff_tree_to_index(Some(&head), Some(&index), None)?
@@ -75,7 +74,11 @@ pub fn check_no_staged_changes(paths: &[UnglobbedPath]) -> Result<()> {
     let mut conflicts: Vec<_> = staged.intersection(&unstaged).collect();
     if !conflicts.is_empty() {
         conflicts.sort();
-        let list = conflicts.iter().map(|p| format!("  {}", p.display())).collect::<Vec<_>>().join("\n");
+        let list = conflicts
+            .iter()
+            .map(|p| format!("  {}", p.display()))
+            .collect::<Vec<_>>()
+            .join("\n");
         bail!(
             "staged changes at these paths differ from working tree:\n{list}\n\n\
              These would be overwritten. Either:\n  \
@@ -109,7 +112,7 @@ pub struct StageResult {
 ///
 /// # Errors
 /// Returns an error if paths is empty or staging fails.
-pub fn stage_paths_to_temp(paths: &[UnglobbedPath]) -> Result<StageResult> {
+pub fn stage_paths_to_temp(paths: &[PathBuf]) -> Result<StageResult> {
     use std::borrow::Cow;
 
     if paths.is_empty() {
@@ -128,13 +131,13 @@ pub fn stage_paths_to_temp(paths: &[UnglobbedPath]) -> Result<StageResult> {
     let repo_relative_paths: Vec<PathBuf> = paths
         .iter()
         .map(|p| {
-            let absolute = cwd.join(p.as_ref());
+            let absolute = cwd.join(p);
             let normalized = gix_path::normalize(Cow::Owned(absolute), &cwd)
                 .context("path normalization failed")?;
             normalized
                 .strip_prefix(&repo_root)
                 .map(Path::to_path_buf)
-                .with_context(|| format!("{} is outside repository", p.as_ref().display()))
+                .with_context(|| format!("{} is outside repository", p.display()))
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -173,7 +176,8 @@ pub fn stage_paths_to_temp(paths: &[UnglobbedPath]) -> Result<StageResult> {
         .peel_to_tree()
         .context("failed to peel HEAD to tree")?;
 
-    let staged_entries = find_staged_in_index(&repo, &temp_index, &head_tree, &repo_relative_paths)?;
+    let staged_entries =
+        find_staged_in_index(&repo, &temp_index, &head_tree, &repo_relative_paths)?;
 
     Ok(StageResult {
         temp_index_path: temp_path,
@@ -204,10 +208,7 @@ fn find_staged_in_index(
             continue;
         }
 
-        let path_str = path
-            .to_str()
-            .context("path is not valid UTF-8")?
-            .to_owned();
+        let path_str = path.to_str().context("path is not valid UTF-8")?.to_owned();
 
         let entry = if delta.status() == git2::Delta::Deleted {
             (path_str, None)
@@ -242,4 +243,3 @@ pub fn discard_staged_index(stage_result: &StageResult) -> Result<()> {
     }
     Ok(())
 }
-

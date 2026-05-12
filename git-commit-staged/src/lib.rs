@@ -15,7 +15,7 @@
 //! - [`index`] - Temporary index file creation
 //! - [`exec`] - CLI execution helpers
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use git2::Oid;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -25,7 +25,6 @@ pub mod exec;
 pub mod index;
 pub mod lock;
 pub mod prepare;
-pub mod unglobbed_path;
 mod workdir;
 
 pub use workdir::ensure_pwd;

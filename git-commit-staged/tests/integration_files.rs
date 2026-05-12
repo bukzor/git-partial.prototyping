@@ -82,7 +82,9 @@ fn git_commit_files(dir: &Path, args: &[&str]) -> std::process::Output {
 /// Create a test repo with an initial commit, wrapped with no-leftovers
 /// assertions on drop.
 fn setup_repo() -> TestRepo {
-    TestRepo { tmp: testing::setup_repo() }
+    TestRepo {
+        tmp: testing::setup_repo(),
+    }
 }
 
 #[test]
@@ -180,6 +182,40 @@ fn preserves_already_staged_changes_at_other_paths() {
 }
 
 #[test]
+fn commits_working_tree_deletion_under_directory_pathspec() {
+    // User deletes a file in the working tree, then commits the parent
+    // directory: `rm src/foo.rs; git commit-files src/ -- -m ...`.
+    // This is the exact shape of `git add src/ && git commit -m ...`,
+    // which stages the deletion. commit-files should do the same.
+    let tmp = setup_repo();
+    let dir = tmp.path();
+
+    fs::create_dir_all(dir.join("src")).unwrap();
+    fs::write(dir.join("src/foo.rs"), "fn foo() {}\n").unwrap();
+    fs::write(dir.join("src/bar.rs"), "fn bar() {}\n").unwrap();
+    git(dir, &["add", "src/"]);
+    git(dir, &["commit", "-m", "Add src/"]);
+
+    fs::remove_file(dir.join("src/foo.rs")).unwrap();
+
+    let output = git_commit_files(dir, &["src", "--", "-m", "Remove foo"]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let show = git(dir, &["show", "--name-status", "--format="]);
+    assert!(
+        show.contains("D\tsrc/foo.rs"),
+        "expected deletion of src/foo.rs in commit: {show}"
+    );
+
+    let status = git(dir, &["status", "--porcelain"]);
+    assert!(status.trim().is_empty(), "status should be clean: {status}");
+}
+
+#[test]
 fn dry_run_shows_what_would_be_committed() {
     let tmp = setup_repo();
     let dir = tmp.path();
@@ -259,7 +295,10 @@ fn commits_already_staged_deletion() {
 
     // Commit using commit-files with exact file path (not directory)
     // This reproduces the bug: git add fails on already-staged deleted file
-    let output = git_commit_files(dir, &["src/obsolete.rs", "--", "-m", "Remove obsolete file"]);
+    let output = git_commit_files(
+        dir,
+        &["src/obsolete.rs", "--", "-m", "Remove obsolete file"],
+    );
     assert!(
         output.status.success(),
         "stderr: {}",
@@ -304,10 +343,7 @@ fn bails_when_staged_changes_differ_from_working_tree() {
 
     // commit-files should bail
     let output = git_commit_files(dir, &["src", "--", "-m", "Should fail"]);
-    assert!(
-        !output.status.success(),
-        "should have failed but succeeded"
-    );
+    assert!(!output.status.success(), "should have failed but succeeded");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -340,10 +376,7 @@ fn fails_when_lock_is_held() {
 
     // commit-files should fail gracefully
     let output = git_commit_files(dir, &["src", "--", "-m", "Should fail"]);
-    assert!(
-        !output.status.success(),
-        "should have failed due to lock"
-    );
+    assert!(!output.status.success(), "should have failed due to lock");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -366,7 +399,7 @@ fn version_includes_git_hash() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     // Should match pattern: "git-commit-files X.Y.Z (abcdef1)"
     assert!(
-        stdout.contains("git-commit-files") && stdout.contains("("),
+        stdout.contains("git-commit-files") && stdout.contains('('),
         "version should include git hash: {stdout}"
     );
 }
@@ -418,7 +451,10 @@ fn commits_from_subdirectory() {
 
     // Run commit-files from the subdirectory
     let subdir = dir.join("apps/myapp");
-    let output = git_commit_files(&subdir, &["src/main.rs", "--", "-m", "Add main.rs from subdir"]);
+    let output = git_commit_files(
+        &subdir,
+        &["src/main.rs", "--", "-m", "Add main.rs from subdir"],
+    );
     assert!(
         output.status.success(),
         "stderr: {}",

@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::{CommandFactory, FromArgMatches};
 
 mod cli;
@@ -10,19 +10,12 @@ use git_commit_staged::exec::{
 };
 use git_commit_staged::index::write_temp_index_for_paths;
 use git_commit_staged::lock::IndexLock;
-use git_commit_staged::unglobbed_path::UnglobbedPath;
 
 const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")");
 
 fn main() -> Result<()> {
     git_commit_staged::ensure_pwd();
     let args = Args::from_arg_matches(&Args::command().version(VERSION).get_matches())?;
-
-    // Expand directories to files
-    let files = UnglobbedPath::from_paths(&args.paths);
-    if files.is_empty() {
-        bail!("no files found at specified paths");
-    }
 
     // Acquire lock before reading any state (skip for dry-run)
     let _lock = if args.dry_run {
@@ -32,10 +25,10 @@ fn main() -> Result<()> {
     };
 
     // Bail if staging would destroy existing staged changes
-    check_no_staged_changes(&files)?;
+    check_no_staged_changes(&args.paths)?;
 
     // Stage working tree to temp index (same code path for dry-run and real)
-    let stage_result = stage_paths_to_temp(&files)?;
+    let stage_result = stage_paths_to_temp(&args.paths)?;
 
     if stage_result.staged_entries.is_empty() {
         discard_staged_index(&stage_result)?;

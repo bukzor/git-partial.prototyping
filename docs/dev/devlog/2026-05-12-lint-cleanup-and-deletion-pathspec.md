@@ -86,6 +86,39 @@ ref-name shape.
 All pass; clippy clean under `-D warnings`; `cargo fmt --all --check`
 clean.
 
+## Follow-ups Identified, Not Done
+
+Surfaced during the same audit pass but deferred:
+
+- **Library API safety** (`lib.rs::git_commit_staged`): the convenience
+  function in the library does not call `ensure_pwd()` and does not
+  acquire `IndexLock`. The binaries do both. A library user reading
+  just the function signature can miss the contract. Either auto-call
+  `ensure_pwd()` inside, or take an explicit `cwd: &Path`.
+- **`&commit_sha[..7]` slicing** in both `*/main.rs`: git's abbrev
+  length is dynamic (≥7 in practice for non-tiny repos but not
+  guaranteed). A panic would surface as `byte index N is out of
+  bounds`. Cheap to make defensive via `commit_sha.get(..7)
+  .unwrap_or(&commit_sha)`.
+- **Two-temp-index dance in commit-files**
+  (`files/main.rs::main`): `stage_paths_to_temp` →
+  `commit_staged_index` (rename to real index) →
+  `write_temp_index_for_paths` (build a second temp index containing
+  only HEAD + our entries) → `do_commit`. Reason: post-rename real
+  index may carry unrelated entries from earlier `git add` activity
+  that we don't want in this commit. The logic is correct but
+  uncommented; a `WHY` one-liner would help cold readers.
+- **`030-production-hardening.md` milestone doc is stale**: still
+  references an older `git partial init/commit/abort` design rather
+  than the actual `git commit-staged` / `git commit-files`
+  implementation. Worth rewriting against current reality next time
+  030 work is queued.
+- **No mutation-test entry for the deletion-pathspec gap**: the
+  `mutation-testing.kb/` collection captures previous "tests didn't
+  catch this mutation" findings. The directory-pathspec deletion bug
+  was a real bug no test caught; adding an entry would close the loop
+  for the post-hoc TDD discipline used elsewhere here.
+
 ## Links
 
 - Audit notes that triggered this session: in conversation context only

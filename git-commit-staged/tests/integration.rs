@@ -243,7 +243,7 @@ fn version_includes_git_hash() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     // Should match pattern: "git-commit-staged X.Y.Z (abcdef1)"
     assert!(
-        stdout.contains("git-commit-staged") && stdout.contains("("),
+        stdout.contains("git-commit-staged") && stdout.contains('('),
         "version should include git hash: {stdout}"
     );
 }

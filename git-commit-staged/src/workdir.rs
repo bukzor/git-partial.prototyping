@@ -58,7 +58,11 @@ use std::path::{Path, PathBuf};
 pub fn logical_cwd() -> PathBuf {
     let pwd = std::env::var_os("PWD").expect("$PWD must be set");
     let pwd = PathBuf::from(pwd);
-    assert!(pwd.is_absolute(), "$PWD must be absolute: {}", pwd.display());
+    assert!(
+        pwd.is_absolute(),
+        "$PWD must be absolute: {}",
+        pwd.display()
+    );
     pwd
 }
 
@@ -105,7 +109,9 @@ pub fn ensure_pwd() {
 
 /// True iff `$PWD` is absolute and names the same inode as `.`.
 fn pwd_names_cwd() -> bool {
-    let Some(pwd) = std::env::var_os("PWD") else { return false };
+    let Some(pwd) = std::env::var_os("PWD") else {
+        return false;
+    };
     let pwd = PathBuf::from(pwd);
     pwd.is_absolute() && samefile(Path::new("."), &pwd)
 }
@@ -118,7 +124,7 @@ fn pwd_names_cwd() -> bool {
 ///
 /// Rust's stdlib has no equivalent; the `same-file` crate exists but
 /// dragging in a dependency for one `stat` comparison isn't worth it.
-pub(crate) fn samefile(a: &Path, b: &Path) -> bool {
+pub fn samefile(a: &Path, b: &Path) -> bool {
     use std::os::unix::fs::MetadataExt;
     let (Ok(a), Ok(b)) = (std::fs::metadata(a), std::fs::metadata(b)) else {
         return false;

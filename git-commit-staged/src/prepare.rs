@@ -1,6 +1,6 @@
 //! Prepare staged changes at specific paths for commit.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use git2::Repository;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};

@@ -26,6 +26,9 @@ pub mod index;
 pub mod lock;
 pub mod prepare;
 pub mod unglobbed_path;
+mod workdir;
+
+pub use workdir::ensure_pwd;
 
 #[cfg(test)]
 mod tests;

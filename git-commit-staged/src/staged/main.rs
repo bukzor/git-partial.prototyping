@@ -12,6 +12,7 @@ use git_commit_staged::prepare_staged_commit;
 const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")");
 
 fn main() -> Result<()> {
+    git_commit_staged::ensure_pwd();
     let args = Args::from_arg_matches(&Args::command().version(VERSION).get_matches())?;
 
     // Acquire lock before reading any state (skip for dry-run)

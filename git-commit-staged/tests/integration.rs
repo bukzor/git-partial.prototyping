@@ -9,24 +9,8 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use tempfile::TempDir;
-
-/// Helper to run git commands in a directory
-fn git(dir: &Path, args: &[&str]) -> String {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .expect("failed to execute git");
-
-    assert!(
-        output.status.success(),
-        "git {:?} failed: {}",
-        args,
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8_lossy(&output.stdout).to_string()
-}
+mod testing;
+use testing::{git, setup_repo};
 
 /// Helper to run our binary via `git -C <dir> commit-staged`
 fn git_commit_staged(dir: &Path, args: &[&str]) -> std::process::Output {
@@ -44,23 +28,6 @@ fn git_commit_staged(dir: &Path, args: &[&str]) -> std::process::Output {
         .env("PATH", new_path)
         .output()
         .expect("failed to execute git commit-staged")
-}
-
-/// Create a test repo with an initial commit
-fn setup_repo() -> TempDir {
-    let tmp = TempDir::new().expect("failed to create temp dir");
-    let dir = tmp.path();
-
-    git(dir, &["init", "-b", "main"]);
-    git(dir, &["config", "user.email", "test@test.com"]);
-    git(dir, &["config", "user.name", "Test User"]);
-
-    // Initial commit
-    fs::write(dir.join("README.md"), "# Test Repo\n").unwrap();
-    git(dir, &["add", "README.md"]);
-    git(dir, &["commit", "-m", "Initial commit"]);
-
-    tmp
 }
 
 /// Helper to run via `git -C <subdir>` within a repo

@@ -18,14 +18,18 @@ use crate::{PrepareResult, StagedEntry};
 ///
 /// # Arguments
 /// * `paths` - Paths to commit (only staged changes at these paths)
-/// * `directory` - Run as if git was started in this directory
+/// * `directory` - Run as if git was started in this directory. A
+///   relative path is resolved against [`crate::workdir::logical_cwd`]
+///   (which reads `$PWD`); library callers must ensure `$PWD` reflects
+///   the real cwd before calling. CLI binaries arrange this via
+///   [`crate::ensure_pwd`] at the top of `main`; consumers driving the
+///   API from arbitrary code should either call `ensure_pwd` themselves
+///   or pass an absolute path.
 /// * `dry_run` - If true, show what would be committed without creating temp index
 ///
 /// # Errors
 /// Returns an error if:
-/// - The directory cannot be canonicalized
-/// - No git repository is found
-/// - The repository has no workdir (bare repo)
+/// - No `.git` is found at or above the resolved directory
 /// - A path escapes the scope directory
 /// - No HEAD commit exists (empty repo)
 /// - No staged changes exist at the specified paths
@@ -35,18 +39,21 @@ pub fn prepare_staged_commit<P: AsRef<Path>>(
     directory: &Path,
     dry_run: bool,
 ) -> Result<PrepareResult> {
-    // Canonicalize scope root (the -C directory) - this resolves symlinks
-    let scope_root = std::fs::canonicalize(directory)
-        .with_context(|| format!("failed to canonicalize {}", directory.display()))?;
+    // Resolve -C directory against logical $PWD (symlink-preserving),
+    // then textually normalize so the downstream parent()-walk and
+    // starts_with() checks work on a clean form. The join handles the
+    // relative-to-absolute step; gix_path::normalize only resolves `.`
+    // and `..` components (it doesn't anchor relative paths itself).
+    let absolute = crate::workdir::logical_cwd().join(directory);
+    let scope_root = gix_path::normalize(Cow::Owned(absolute), Path::new("/"))
+        .with_context(|| format!("could not normalize {}", directory.display()))?
+        .into_owned();
 
     let repo = Repository::discover(&scope_root)
         .with_context(|| format!("failed to discover repository at {}", scope_root.display()))?;
 
-    let repo_root = repo
-        .workdir()
-        .context("repository has no workdir (bare repo?)")?;
-    let repo_root =
-        std::fs::canonicalize(repo_root).context("failed to canonicalize repo workdir")?;
+    // Bypass repo.workdir() — see crate::workdir for why.
+    let repo_root = crate::workdir::repo_workdir(&scope_root)?;
 
     // Resolve user paths to repo-relative paths
     let resolved_paths = resolve_paths(paths, &scope_root, &repo_root)?;

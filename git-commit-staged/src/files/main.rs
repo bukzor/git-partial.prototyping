@@ -15,6 +15,7 @@ use git_commit_staged::unglobbed_path::UnglobbedPath;
 const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")");
 
 fn main() -> Result<()> {
+    git_commit_staged::ensure_pwd();
     let args = Args::from_arg_matches(&Args::command().version(VERSION).get_matches())?;
 
     // Expand directories to files

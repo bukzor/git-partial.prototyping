@@ -9,6 +9,9 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
+mod testing;
+use testing::git;
+
 /// Test repo wrapper that asserts no lock/temp files on drop
 struct TestRepo {
     tmp: TempDir,
@@ -59,23 +62,6 @@ impl Drop for TestRepo {
     }
 }
 
-/// Helper to run git commands in a directory
-fn git(dir: &Path, args: &[&str]) -> String {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .expect("failed to execute git");
-
-    assert!(
-        output.status.success(),
-        "git {:?} failed: {}",
-        args,
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8_lossy(&output.stdout).to_string()
-}
-
 /// Helper to run our binary via `git -C <dir> commit-files`
 fn git_commit_files(dir: &Path, args: &[&str]) -> std::process::Output {
     let binary = env!("CARGO_BIN_EXE_git-commit-files");
@@ -93,21 +79,10 @@ fn git_commit_files(dir: &Path, args: &[&str]) -> std::process::Output {
         .expect("failed to execute git commit-files")
 }
 
-/// Create a test repo with an initial commit
+/// Create a test repo with an initial commit, wrapped with no-leftovers
+/// assertions on drop.
 fn setup_repo() -> TestRepo {
-    let tmp = TempDir::new().expect("failed to create temp dir");
-    let dir = tmp.path();
-
-    git(dir, &["init", "-b", "main"]);
-    git(dir, &["config", "user.email", "test@test.com"]);
-    git(dir, &["config", "user.name", "Test User"]);
-
-    // Initial commit
-    fs::write(dir.join("README.md"), "# Test Repo\n").unwrap();
-    git(dir, &["add", "README.md"]);
-    git(dir, &["commit", "-m", "Initial commit"]);
-
-    TestRepo { tmp }
+    TestRepo { tmp: testing::setup_repo() }
 }
 
 #[test]
@@ -393,6 +368,42 @@ fn version_includes_git_hash() {
     assert!(
         stdout.contains("git-commit-files") && stdout.contains("("),
         "version should include git hash: {stdout}"
+    );
+}
+
+#[test]
+fn commits_through_symlinked_dotgit() {
+    // Companion to git_integration.rs::commits_through_symlinked_dotgit:
+    // that one exercises the commit-staged library path
+    // (prepare.rs::prepare_staged_commit). This one exercises the
+    // commit-files binary, hitting exec.rs::stage_paths_to_temp — the
+    // other call site that bypasses libgit2's misidentified workdir
+    // when `.git` is an absolute symlink (git-localhost-store layout).
+    use std::os::unix::fs::symlink;
+
+    // Plain TempDir (not TestRepo): TestRepo::Drop runs
+    // `git rev-parse --git-dir`, which would walk a broken symlink
+    // once `store` is dropped first.
+    let tmp = testing::setup_repo();
+    let workdir = tmp.path();
+
+    let store = TempDir::new().expect("failed to create store tmp");
+    let external_gitdir = store.path().join("repo");
+    fs::rename(workdir.join(".git"), &external_gitdir).unwrap();
+    symlink(&external_gitdir, workdir.join(".git")).unwrap();
+
+    fs::write(workdir.join("README.md"), "# Updated\n").unwrap();
+    let output = git_commit_files(workdir, &["README.md", "--", "-m", "Update README"]);
+    assert!(
+        output.status.success(),
+        "commit-files should succeed through symlinked .git: stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let log = git(workdir, &["log", "--oneline"]);
+    assert!(
+        log.contains("Update README"),
+        "expected commit in log: {log}"
     );
 }
 

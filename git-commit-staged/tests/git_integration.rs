@@ -9,58 +9,15 @@
 use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 use tempfile::TempDir;
 
 use git_commit_staged::git_commit_staged;
 
-/// Helper to run git commands in a directory
-fn git(dir: &Path, args: &[&str]) -> String {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .expect("failed to execute git");
-
-    assert!(
-        output.status.success(),
-        "git {:?} failed: {}",
-        args,
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8_lossy(&output.stdout).to_string()
-}
-
-/// Create a test repo with an initial commit
-fn setup_repo() -> TempDir {
-    let tmp = TempDir::new().expect("failed to create temp dir");
-    let dir = tmp.path();
-
-    git(dir, &["init", "-b", "main"]);
-    git(dir, &["config", "user.email", "test@test.com"]);
-    git(dir, &["config", "user.name", "Test User"]);
-
-    // Initial commit
-    fs::write(dir.join("README.md"), "# Test Repo\n").unwrap();
-    git(dir, &["add", "README.md"]);
-    git(dir, &["commit", "-m", "Initial commit"]);
-
-    tmp
-}
-
-/// Create a test repo without any commits (empty repo)
-fn setup_empty_repo() -> TempDir {
-    let tmp = TempDir::new().expect("failed to create temp dir");
-    let dir = tmp.path();
-
-    git(dir, &["init", "-b", "main"]);
-    git(dir, &["config", "user.email", "test@test.com"]);
-    git(dir, &["config", "user.name", "Test User"]);
-
-    tmp
-}
+mod testing;
+use testing::{git, setup_empty_repo, setup_repo};
 
 #[test]
 fn git_status_clean_after_commit() {
@@ -506,5 +463,54 @@ fn committed_files_unstaged() {
     assert!(
         status_after.contains("A  tests/test.rs"),
         "uncommitted file should still be staged: {status_after}"
+    );
+}
+
+#[test]
+fn commits_through_symlinked_dotgit() {
+    // Reproduces the git-localhost-store layout: the workdir's `.git`
+    // is a symlink to an absolute gitdir path elsewhere on disk.
+    // libgit2's Repository::workdir() returns parent(canonical(gitdir))
+    // for this shape — which is *not* the workdir — so a naive
+    // `repo.workdir()`-based path resolver would reject every path
+    // with "outside repository". This test pins down the fix in
+    // crate::workdir.
+    use std::os::unix::fs::symlink;
+
+    let tmp = setup_repo();
+    let workdir = tmp.path();
+
+    // Move .git out to a separate TempDir and replace with an absolute
+    // symlink — mimicking the git-localhost-store layout.
+    let store = TempDir::new().expect("failed to create store tmp");
+    let external_gitdir = store.path().join("repo");
+    fs::rename(workdir.join(".git"), &external_gitdir).unwrap();
+    symlink(&external_gitdir, workdir.join(".git")).unwrap();
+
+    // Sanity: git itself still recognizes this as a valid repo. Compare
+    // canonical forms so this holds on systems where TempDir lives under
+    // a symlinked root (e.g. macOS `/tmp` → `/private/tmp`).
+    let toplevel = git(workdir, &["rev-parse", "--show-toplevel"]);
+    assert_eq!(
+        fs::canonicalize(toplevel.trim()).unwrap(),
+        fs::canonicalize(workdir).unwrap(),
+        "git should still see workdir despite symlinked .git",
+    );
+
+    // Stage a change and commit through the in-process API.
+    fs::write(workdir.join("README.md"), "# Updated\n").unwrap();
+    git(workdir, &["add", "README.md"]);
+    git_commit_staged(
+        &[PathBuf::from("README.md")],
+        "Update README",
+        workdir,
+        false,
+    )
+    .expect("commit should succeed despite symlinked .git");
+
+    let log = git(workdir, &["log", "--oneline"]);
+    assert!(
+        log.contains("Update README"),
+        "expected commit in log: {log}"
     );
 }

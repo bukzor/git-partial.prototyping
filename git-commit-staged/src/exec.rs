@@ -119,12 +119,11 @@ pub fn stage_paths_to_temp(paths: &[UnglobbedPath]) -> Result<StageResult> {
     let repo = Repository::open_from_env().context("failed to open repository")?;
     let mut index = repo.index().context("failed to get index")?;
 
-    // Resolve user paths to repo-relative paths
-    let cwd = std::env::current_dir().context("failed to get current directory")?;
-    let repo_root = repo
-        .workdir()
-        .context("repository has no workdir")?;
-    let repo_root = std::fs::canonicalize(repo_root).context("failed to canonicalize repo root")?;
+    // Resolve user paths to repo-relative paths using logical $PWD,
+    // preserving symlinks (not std::env::current_dir, which resolves
+    // them on Linux). Bypass repo.workdir() — see crate::workdir.
+    let cwd = crate::workdir::logical_cwd();
+    let repo_root = crate::workdir::repo_workdir(&cwd)?;
 
     let repo_relative_paths: Vec<PathBuf> = paths
         .iter()

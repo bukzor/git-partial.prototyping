@@ -3,7 +3,7 @@
 //! Spawns git commit as subprocess while holding the main index lock,
 //! preserving full git commit compatibility (--amend, --fixup, -C, etc.).
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::path::Path;
 use std::process::Command;
 
@@ -22,10 +22,7 @@ pub struct CommitOutput {
 ///
 /// # Errors
 /// - Git commit fails (hooks reject, no message, etc.)
-pub fn do_commit(
-    temp_index_path: &Path,
-    passthrough_args: &[String],
-) -> Result<CommitOutput> {
+pub fn do_commit(temp_index_path: &Path, passthrough_args: &[String]) -> Result<CommitOutput> {
     let output = Command::new("git")
         .arg("commit")
         .args(passthrough_args)
@@ -48,12 +45,18 @@ pub fn do_commit(
     Ok(CommitOutput { commit_sha })
 }
 
-/// Extract short SHA from git commit output like "[main abc1234] message"
+/// Extract short SHA from git commit output.
+///
+/// Git's first line looks like `[<ref-or-state> <sha>] <message>`, where
+/// `<ref-or-state>` is one of: a branch name, `detached HEAD`, or
+/// `root-commit <branch>` (and combinations on the initial commit of a
+/// detached HEAD). The SHA is always the last space-separated token
+/// inside the brackets.
 fn parse_commit_sha(output: &str) -> Option<String> {
     let line = output.lines().next()?;
-    let start = line.find(' ')? + 1;
-    let end = line[start..].find(']').map(|i| start + i)?;
-    Some(line[start..end].to_string())
+    let inside = line.strip_prefix('[')?;
+    let inside = &inside[..inside.find(']')?];
+    Some(inside.rsplit(' ').next()?.to_string())
 }
 
 #[cfg(test)]
@@ -68,7 +71,11 @@ mod tests {
         );
         assert_eq!(
             parse_commit_sha("[detached HEAD def5678] Fix bug"),
-            Some("HEAD def5678".to_string())
+            Some("def5678".to_string())
+        );
+        assert_eq!(
+            parse_commit_sha("[main (root-commit) 0123abc] Initial"),
+            Some("0123abc".to_string())
         );
     }
 }

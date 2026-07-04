@@ -1,5 +1,17 @@
+---
+status: open
+cost-benefit-sweh:
+  timebox:
+    '@value': 0
+    rationale: 'zero residual: all inline items done; sole open item is the child todo.d ref, rated separately'
+    confidence: confident
+  benefit-2w:
+    '@value': 0
+    confidence: confident
+---
 # Current Work
 
+- [ ] [todo.d/2026-06-27-000-initial-commit-and-stdin-message.md](todo.d/2026-06-27-000-initial-commit-and-stdin-message.md) — `commit-files`/`commit-staged` can't make a repo's initial commit (unborn branch), and `-F -` silently yields an empty message
 - [x] Add `--version` flag with embedded git commit hash
 - [x] `commit-files` should handle untracked files — fixed by `update_all` + `add_all` (b32f9f9)
 - [x] `commit-files` fails on deleted files — replaced shell-out `git add` with git2 `update_all` + `add_all`

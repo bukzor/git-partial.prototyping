@@ -2,6 +2,7 @@
 depends:
   - skills/llm.kb
   - skills/llm-collab
+git-caution: personal
 ---
 
 # git-partial

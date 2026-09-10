@@ -24,7 +24,13 @@ cost-benefit-sweh:
       branch named `commit-staged`, costing a verification round-trip to
       rule out. Print the real branch.
 - [ ] Stale `.git/index.commit-staged.*` temp indexes accumulate — 9 in
-      this repo as of 2026-09-10. Remove on exit, failure path included.
+      this repo as of 2026-09-10. Cleanup does exist (`commit.rs:34`,
+      `exec.rs:37` and `:241`, `lib.rs:106`), but every call is
+      `let _ = remove_file(...)`, discarding the failure, and
+      `exec_git_commit` cannot clean up on success at all: it `exec()`s,
+      replacing the process image, so its own removal at `exec.rs:37` is
+      unreachable except on the error path. Date the strays (mtime/pid)
+      to learn which path produced them before choosing a fix.
 - [ ] Rename `docs/dev/design.kb/discovered-constraints.kb/no-git-plumbing-for-hunks.md`
       to scope its claim to reading (e.g. `no-plumbing-for-reading-hunks.md`).
       The body was corrected in 8c64d88, but filename and H1 still

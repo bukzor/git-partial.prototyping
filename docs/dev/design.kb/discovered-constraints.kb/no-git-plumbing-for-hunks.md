@@ -5,7 +5,7 @@ solutions:
 
 # No Git Plumbing for Hunks
 
-Git's plumbing commands operate at file/blob level, not hunk level.
+Git's plumbing commands *report* changes at file/blob level, not hunk level.
 
 ## What Exists
 
@@ -24,6 +24,8 @@ Provides blob hashes, not hunk boundaries.
 ## Implication
 
 Unified diff format (`git diff -p`) is the lowest level for change content. Hunk extraction requires parsing the unified diff output.
+
+This binds reading only. Writing at hunk granularity needs no parsing: `git apply --cached` applies a chosen subset of hunks to the index, leaving the working tree untouched.
 
 ## Source
 

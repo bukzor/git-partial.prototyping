@@ -12,6 +12,24 @@ cost-benefit-sweh:
 # Current Work
 
 - [ ] [todo.d/2026-06-27-000-initial-commit-and-stdin-message.md](todo.d/2026-06-27-000-initial-commit-and-stdin-message.md) — `commit-files`/`commit-staged` can't make a repo's initial commit (unborn branch), and `-F -` silently yields an empty message
+- [ ] Dry-run mislabels an add as a modification: `commit-files -n` and
+      `commit-staged -n` both print `M` for a path the index holds as
+      `A`. Observed 2026-09-10 committing a new file in `bukzor/dotfiles`
+      (`git status` showed `??`, then `A` after staging; both dry-runs
+      said `M`). The dry-run's job is catching a wrong-scope commit
+      before it happens, so a status letter that can't separate add from
+      modify undercuts it.
+- [ ] Commit output prints the tool's name where git prints the branch:
+      `[commit-staged 05ba082]`, `[commit-files 8c64d88]`. It reads as a
+      branch named `commit-staged`, costing a verification round-trip to
+      rule out. Print the real branch.
+- [ ] Stale `.git/index.commit-staged.*` temp indexes accumulate — 9 in
+      this repo as of 2026-09-10. Remove on exit, failure path included.
+- [ ] Rename `docs/dev/design.kb/discovered-constraints.kb/no-git-plumbing-for-hunks.md`
+      to scope its claim to reading (e.g. `no-plumbing-for-reading-hunks.md`).
+      The body was corrected in 8c64d88, but filename and H1 still
+      overclaim: `git apply --cached` does write at hunk grain. No
+      inbound references, so the rename is free. Awaiting owner's ruling.
 - [x] Add `--version` flag with embedded git commit hash
 - [x] `commit-files` should handle untracked files — fixed by `update_all` + `add_all` (b32f9f9)
 - [x] `commit-files` fails on deleted files — replaced shell-out `git add` with git2 `update_all` + `add_all`

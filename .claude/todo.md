@@ -31,11 +31,10 @@ cost-benefit-sweh:
       replacing the process image, so its own removal at `exec.rs:37` is
       unreachable except on the error path. Date the strays (mtime/pid)
       to learn which path produced them before choosing a fix.
-- [ ] Rename `docs/dev/design.kb/discovered-constraints.kb/no-git-plumbing-for-hunks.md`
-      to scope its claim to reading (e.g. `no-plumbing-for-reading-hunks.md`).
-      The body was corrected in 8c64d88, but filename and H1 still
-      overclaim: `git apply --cached` does write at hunk grain. No
-      inbound references, so the rename is free. Awaiting owner's ruling.
+- [x] Renamed `no-git-plumbing-for-hunks.md` → `no-plumbing-for-reading-hunks.md`,
+      H1 with it. Body was corrected in 8c64d88; the name kept
+      overclaiming, since `git apply --cached` does write at hunk grain.
+      Zero inbound references, so nothing else moved.
 - [x] Add `--version` flag with embedded git commit hash
 - [x] `commit-files` should handle untracked files — fixed by `update_all` + `add_all` (b32f9f9)
 - [x] `commit-files` fails on deleted files — replaced shell-out `git add` with git2 `update_all` + `add_all`

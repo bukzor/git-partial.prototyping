@@ -3,7 +3,7 @@ solutions:
   - ../technology-choices.kb/diff-parsing-library.md
 ---
 
-# No Git Plumbing for Hunks
+# No Plumbing for Reading Hunks
 
 Git's plumbing commands *report* changes at file/blob level, not hunk level.
 

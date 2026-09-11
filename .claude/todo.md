@@ -23,14 +23,19 @@ cost-benefit-sweh:
       `[commit-staged 05ba082]`, `[commit-files 8c64d88]`. It reads as a
       branch named `commit-staged`, costing a verification round-trip to
       rule out. Print the real branch.
-- [ ] Stale `.git/index.commit-staged.*` temp indexes accumulate — 9 in
-      this repo as of 2026-09-10. Cleanup does exist (`commit.rs:34`,
-      `exec.rs:37` and `:241`, `lib.rs:106`), but every call is
-      `let _ = remove_file(...)`, discarding the failure, and
-      `exec_git_commit` cannot clean up on success at all: it `exec()`s,
-      replacing the process image, so its own removal at `exec.rs:37` is
-      unreachable except on the error path. Date the strays (mtime/pid)
-      to learn which path produced them before choosing a fix.
+- [ ] Stale `.git/index.commit-staged.*` temp indexes: 9 here, 0 in
+      three other repos that use these tools daily (`bukzor/dotfiles`,
+      `bukzor.claude-sessions`, `bukzor-agent-skills`). All 9 date
+      2025-12-23..2026-02-04, and ~8 `commit-staged` runs on
+      2026-09-11 added none — so this is **not** an ongoing leak from
+      the normal path, and the strays likely just need deleting.
+      Cleanup does exist (`commit.rs:34`, `exec.rs:37` and `:241`,
+      `lib.rs:106`), but every call is `let _ = remove_file(...)`,
+      discarding the failure, and `exec_git_commit` cannot clean up on
+      success at all: it `exec()`s, replacing the process image, so its
+      removal at `exec.rs:37` is unreachable except on the error path.
+      Weigh that hole on its own merits — these 9 are not evidence of
+      it. (Corrected 2026-09-11; the earlier "accumulate" was ungrounded.)
 - [x] Renamed `no-git-plumbing-for-hunks.md` → `no-plumbing-for-reading-hunks.md`,
       H1 with it. Body was corrected in 8c64d88; the name kept
       overclaiming, since `git apply --cached` does write at hunk grain.

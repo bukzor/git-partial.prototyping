@@ -19,6 +19,14 @@ cost-benefit-sweh:
       said `M`). The dry-run's job is catching a wrong-scope commit
       before it happens, so a status letter that can't separate add from
       modify undercuts it.
+- [ ] Make `cargo install` work on musl without flags: the default
+      static link needs `libssl.a`/`libcrypto.a`/`libz.a`, which Alpine
+      doesn't ship by default (hit 2026-11-08 installing on Alpine WSL;
+      worked around with `-C target-feature=-crt-static`, now in
+      README). Candidates: git2's `vendored-openssl` +
+      `vendored-libgit2` features, or dropping `https`/`ssh` from git2
+      entirely — the tool only touches local repos, so it may not
+      need OpenSSL at all.
 - [ ] Commit output prints the tool's name where git prints the branch:
       `[commit-staged 05ba082]`, `[commit-files 8c64d88]`. It reads as a
       branch named `commit-staged`, costing a verification round-trip to

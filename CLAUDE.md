@@ -19,8 +19,5 @@ Prototyping phase. Core functionality implemented.
 
 ## After Pushing
 
-Reinstall to update the binaries:
-
-```bash
-cargo install --path git-commit-staged
-```
+Reinstall to update the binaries — the Cargo command in README § Installation
+(musl/Alpine needs its `RUSTFLAGS`).

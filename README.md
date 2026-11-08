@@ -29,16 +29,29 @@ Equivalent to `git add src/ && git commit-staged src/ -- -m "..."` but atomic.
 
 **Homebrew (recommended):**
 
+The formula lives in this repo, so tap it directly:
+
 ```bash
-brew install bukzor/tap/git-commit-staged
+brew tap bukzor/git-partial https://github.com/bukzor/git-partial.prototyping
+brew install bukzor/git-partial/git-commit-staged
 ```
 
 **Cargo (manual man page install):**
 
 ```bash
-cargo install --path git-commit-staged
+cargo install --locked --path git-commit-staged
 ln -s "$PWD/git-commit-staged/man"/*.1 ~/.local/share/man/man1/
 ```
+
+On musl targets (e.g. Alpine), Rust links statically by default and fails
+with `cannot find -lssl` / `-lcrypto` / `-lz`. Either link dynamically
+against the system libraries:
+
+```bash
+RUSTFLAGS='-C target-feature=-crt-static' cargo install --locked --path git-commit-staged
+```
+
+or install the static libraries (`apk add openssl-libs-static zlib-static`).
 
 ## Usage
 
